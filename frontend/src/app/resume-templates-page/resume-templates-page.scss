@@ -1,0 +1,74 @@
+.templates-page {
+  padding: 20px;
+}
+
+.templates-list {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(3, 1fr); /* 3 per row on desktop */
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.viewer-wrap {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.viewer {
+  width: 100%;
+  height: 360px; /* adjust as needed */
+  border: 0;
+  display: block;
+}
+
+.card-body h2 {
+  margin: 8px 0 4px;
+  font-size: 1.05rem;
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #0f1630;
+  color: #fff;
+  text-decoration: none;
+}
+
+.button.outline {
+  background: transparent;
+  border: 1px solid rgba(15,22,48,0.08);
+  color: inherit;
+}
+
+@media (max-width: 960px) {
+  .templates-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .templates-list {
+    grid-template-columns: 1fr; /* single column on mobile */
+  }
+
+  .viewer {
+    height: 260px;
+  }
+}
