@@ -12,20 +12,181 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─────────────────────────────────────────
+// USER
+// Created by Prithvi's OAuth flow.
+// email comes from Google OAuth profile.
+// ─────────────────────────────────────────
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
   name      String?
-  resumes   Resume[]
+  avatarUrl String?
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile   Profile?
 }
 
-model Resume {
+// ─────────────────────────────────────────
+// PROFILE
+// One per user. Stores basic info + social links.
+// Populated via resume upload (AI parse) or manual entry.
+// ─────────────────────────────────────────
+model Profile {
   id        String   @id @default(uuid())
-  title     String
-  content   Json
-  userId    String
-  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Basic info
+  headline  String?
+  phone     String?
+  location  String?
+  summary   String?
+
+  // Social / portfolio links
+  linkedin  String?
+  github    String?
+  portfolio String?
+
+  // Resume file (stored in DigitalOcean Spaces, we keep the URL)
+  resumeUrl      String?
+  resumeFileName String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sections ProfileSection[]
+}
+
+// ─────────────────────────────────────────
+// PROFILE SECTION
+// Each section is a fixed type (enum).
+// A user can have one or more sections of the same type
+// (e.g. two "Work Experience" sections is unusual but allowed).
+// `order` controls display order — update on drag-and-drop.
+// ─────────────────────────────────────────
+model ProfileSection {
+  id        String      @id @default(uuid())
+  profileId String
+  profile   Profile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  type      SectionType
+  label     String      // display name, e.g. "Work Experience" (user can rename)
+  order     Int         // 0-based display order
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  instances ProfileInstance[]
+}
+
+// ─────────────────────────────────────────
+// PROFILE INSTANCE
+// One concrete entry inside a section.
+// e.g. one job, one degree, one skill category.
+//
+// `data` is a flexible JSON field — schema varies by SectionType.
+// See comments below for expected shapes.
+// ─────────────────────────────────────────
+model ProfileInstance {
+  id        String         @id @default(uuid())
+  sectionId String
+  section   ProfileSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  order     Int
+  data      Json
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// ─────────────────────────────────────────
+// SECTION TYPES
+// Fixed enum — frontend uses this to render
+// the correct form fields per section.
+// ─────────────────────────────────────────
+enum SectionType {
+  WORK_EXPERIENCE
+  EDUCATION
+  SKILLS
+  PROJECTS
+  CERTIFICATIONS
+  AWARDS
+  LANGUAGES
+  VOLUNTEER
+}
+
+// ─────────────────────────────────────────
+// JSON DATA SHAPES (for reference, not enforced by DB)
+//
+// WORK_EXPERIENCE:
+// {
+//   "company": "Shopify",
+//   "title": "Software Engineer",
+//   "location": "Toronto, ON",
+//   "startDate": "2022-06",
+//   "endDate": "2024-03",
+//   "current": false,
+//   "bullets": ["Led migration...", "Reduced latency by 40%..."]
+// }
+//
+// EDUCATION:
+// {
+//   "school": "University of Toronto",
+//   "degree": "Bachelor of Science",
+//   "field": "Computer Science",
+//   "startDate": "2018-09",
+//   "endDate": "2022-06",
+//   "gpa": "3.8",
+//   "bullets": ["Dean's List 2021", "Robotics Club President"]
+// }
+//
+// SKILLS:
+// {
+//   "category": "Languages",
+//   "skills": ["TypeScript", "Python", "SQL"]
+// }
+//
+// PROJECTS:
+// {
+//   "name": "Tailr",
+//   "url": "https://github.com/...",
+//   "startDate": "2025-01",
+//   "endDate": null,
+//   "current": true,
+//   "bullets": ["Built with Angular + Express...", "Deployed on DigitalOcean..."]
+// }
+//
+// CERTIFICATIONS:
+// {
+//   "name": "AWS Solutions Architect",
+//   "issuer": "Amazon Web Services",
+//   "date": "2024-03",
+//   "url": "https://..."
+// }
+//
+// AWARDS:
+// {
+//   "title": "Dean's List",
+//   "issuer": "University of Toronto",
+//   "date": "2022-04",
+//   "description": "Top 10% of graduating class"
+// }
+//
+// LANGUAGES:
+// {
+//   "language": "French",
+//   "proficiency": "Professional"
+// }
+//
+// VOLUNTEER:
+// {
+//   "organization": "Code for Canada",
+//   "role": "Mentor",
+//   "startDate": "2023-09",
+//   "endDate": null,
+//   "current": true,
+//   "bullets": ["Mentored 3 junior developers..."]
+// }
+// ─────────────────────────────────────────

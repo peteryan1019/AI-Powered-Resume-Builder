@@ -1,0 +1,164 @@
+.profile-layout {
+  display: flex;
+  gap: 2rem;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.profile-sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sidebar-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.nav-item,
+.nav-section-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  color: #333;
+
+  &:hover {
+    background: #f2f2f2;
+  }
+
+  &.active {
+    background: #e8edff;
+    color: #2b4bde;
+  }
+}
+
+.nav-section-item .count {
+  font-size: 0.75rem;
+  color: #999;
+}
+
+.nav-divider {
+  border: none;
+  border-top: 1px solid #eee;
+  margin: 0.75rem 0;
+}
+
+.add-section {
+  color: #2b4bde;
+  font-weight: 500;
+}
+
+.profile-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.page-header h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.5rem;
+}
+
+.page-header p {
+  margin: 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.empty-sections {
+  text-align: center;
+  padding: 3rem 1rem;
+  border: 1px dashed #ddd;
+  border-radius: 8px;
+  color: #666;
+
+  i {
+    font-size: 2rem;
+    color: #bbb;
+  }
+}
+
+.add-section-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  background: #fafafa;
+
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.8rem;
+    color: #555;
+  }
+
+  select,
+  input {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 0.85rem;
+  }
+}
+
+.add-section-error {
+  margin: 0;
+  font-size: 0.75rem;
+  color: #d33;
+}
+
+.add-section-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.btn-secondary {
+  padding: 0.4rem 0.8rem;
+  background: #fff;
+  color: #333;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  background: #2b4bde;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
