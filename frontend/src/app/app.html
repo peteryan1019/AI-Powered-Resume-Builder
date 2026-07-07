@@ -1,8 +1,4 @@
-<!-- app.html -->
-<div class="container">
-  
-  <!-- 1. The Title in Blue -->
-  <h1 class="welcome-title">Welcome to the Resume Builder</h1>
+<app-navbar></app-navbar>
 
   <!-- 2. The Interactive Button -->
   <!-- (click)="addUser()" listens for clicks and runs the method in your app.ts -->
@@ -28,3 +24,6 @@
 <p *ngIf="errorMessage()">{{ errorMessage() }}</p>
 
 </div>
+<main class="container">
+  <router-outlet></router-outlet>
+</main>

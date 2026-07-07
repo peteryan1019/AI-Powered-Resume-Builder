@@ -1,0 +1,22 @@
+<section class="templates-page">
+  <h1>Resume Templates</h1>
+
+  <div class="templates-list">
+    <article class="template-card" *ngFor="let template of templates">
+      <div class="viewer-wrap">
+        <!-- iframe preview (some browsers render PDFs inline) -->
+        <iframe class="viewer" [src]="template.safeUrl" title="{{ template.title }}"></iframe>
+      </div>
+
+      <div class="card-body">
+        <h2>{{ template.title }}</h2>
+        <p>{{ template.description }}</p>
+
+        <div class="card-actions">
+          <a class="button" [href]="template.pdfPath" target="_blank" rel="noopener">Open PDF</a>
+          <a class="button outline" [href]="template.pdfPath" download>Download</a>
+        </div>
+      </div>
+    </article>
+  </div>
+</section>

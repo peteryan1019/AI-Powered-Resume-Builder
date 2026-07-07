@@ -9,6 +9,7 @@ import userRouter from './routes/user_routes.ts';
 import authSession from "./auth/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 
+import profileRouter from './routes/profile_routes.ts';
 
 dotenv.config();
 
@@ -76,5 +77,7 @@ app.post("/auth/logout", (req, res, next) => {
     });
   });
 });
+
+app.use('/api/profile', profileRouter);
 
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
