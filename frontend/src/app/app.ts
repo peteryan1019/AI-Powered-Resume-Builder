@@ -1,14 +1,16 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { JsonPipe } from '@angular/common';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet],
+  imports: [RouterOutlet, JsonPipe],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })
 export class AppComponent implements OnInit {
+  user: any = null;
   userCount = signal(0);
   isLoading = signal(false);
   errorMessage = signal('');
@@ -47,4 +49,32 @@ export class AppComponent implements OnInit {
         }
       });
   }
+
+  googleLogin() {
+    window.location.href = "http://localhost:3000/auth/google";
+  }
+
+  checkUser() {
+    this.http.get("http://localhost:3000/auth/me", {
+      withCredentials: true,
+    }).subscribe({
+      next: (res: any) => {
+        this.user = res.user;
+        console.log(res);
+      },
+      error: (err) => {
+        this.user = null;
+        console.log("Not logged in", err);
+      },
+    });
+  }
+
+  logout() {
+    this.http.post("http://localhost:3000/auth/logout", {}, {
+      withCredentials: true,
+    }).subscribe(() => {
+      this.user = null;
+    });
+  }
+
 }
