@@ -34,6 +34,15 @@ import { SectionType } from '../profile.types';
               <input formControlName="location" placeholder="Toronto, ON" />
             </div>
           </div>
+          <div class="field-group full-width">
+            <label>Role summary</label>
+            <textarea formControlName="summary" rows="3" placeholder="Describe the scope, responsibilities, and outcomes."></textarea>
+          </div>
+          <div class="field-group full-width">
+            <label>Tools / stack</label>
+            <input formControlName="technologiesRaw" placeholder="React, Node.js, PostgreSQL" />
+            <p class="field-hint">Use commas to separate tools, technologies, or methods.</p>
+          </div>
           <div class="form-row">
             <div class="field-group">
               <label>Start date *</label>
@@ -115,6 +124,15 @@ import { SectionType } from '../profile.types';
               <input formControlName="url" placeholder="https://github.com/..." />
             </div>
           </div>
+          <div class="field-group full-width">
+            <label>Project summary</label>
+            <textarea formControlName="summary" rows="3" placeholder="Explain what the project does and why it matters."></textarea>
+          </div>
+          <div class="field-group full-width">
+            <label>Technologies</label>
+            <input formControlName="technologiesRaw" placeholder="Angular, TypeScript, Prisma" />
+            <p class="field-hint">Add one or more tools, libraries, or platforms separated by commas.</p>
+          </div>
           <div class="form-row">
             <div class="field-group">
               <label>Start date</label>
@@ -132,6 +150,7 @@ import { SectionType } from '../profile.types';
             </div>
           </div>
           <ng-container *ngTemplateOutlet="bulletsField"></ng-container>
+          <ng-container *ngTemplateOutlet="customDetailsField"></ng-container>
         </ng-container>
 
         <!-- ── CERTIFICATIONS ─────────────────── -->
@@ -232,6 +251,7 @@ import { SectionType } from '../profile.types';
             </div>
           </div>
           <ng-container *ngTemplateOutlet="bulletsField"></ng-container>
+          <ng-container *ngTemplateOutlet="customDetailsField"></ng-container>
         </ng-container>
 
         <!-- ── Bullets (shared template) ─────── -->
@@ -249,6 +269,27 @@ import { SectionType } from '../profile.types';
             </div>
             <button type="button" class="btn-ghost add-bullet" (click)="addBullet()">
               <i class="ti ti-plus"></i> Add bullet
+            </button>
+          </div>
+        </ng-template>
+
+        <!-- ── Custom details (shared template) ─────── -->
+        <ng-template #customDetailsField>
+          <div class="field-group full-width custom-details-field" *ngIf="supportsCustomDetails" formArrayName="customDetails">
+            <label>Additional details</label>
+            <div
+              *ngFor="let detail of customDetailsArray.controls; let i = index"
+              class="detail-row"
+              [formGroupName]="i"
+            >
+              <input formControlName="label" placeholder="Detail label" />
+              <input formControlName="value" placeholder="Add a metric, skill, outcome, or note..." />
+              <button type="button" class="btn-icon-remove" (click)="removeDetail(i)">
+                <i class="ti ti-x"></i>
+              </button>
+            </div>
+            <button type="button" class="btn-ghost add-bullet" (click)="addDetail()">
+              <i class="ti ti-plus"></i> Add detail
             </button>
           </div>
         </ng-template>
@@ -286,12 +327,28 @@ export class InstanceFormComponent implements OnInit {
     return this.form.get('bullets') as FormArray;
   }
 
+  get customDetailsArray(): FormArray {
+    return this.form.get('customDetails') as FormArray;
+  }
+
+  get supportsCustomDetails(): boolean {
+    return ['WORK_EXPERIENCE', 'PROJECTS'].includes(this.sectionType);
+  }
+
   addBullet(): void {
     this.bulletsArray.push(this.fb.control(''));
   }
 
   removeBullet(index: number): void {
     this.bulletsArray.removeAt(index);
+  }
+
+  addDetail(): void {
+    this.customDetailsArray.push(this.createDetailGroup());
+  }
+
+  removeDetail(index: number): void {
+    this.customDetailsArray.removeAt(index);
   }
 
   onSubmit(): void {
@@ -309,22 +366,40 @@ export class InstanceFormComponent implements OnInit {
       raw.bullets = (raw.bullets as string[]).filter(b => b.trim() !== '');
     }
 
+    if (raw.customDetails) {
+      raw.customDetails = (raw.customDetails as Array<{ label?: string; value?: string }>).filter(detail => {
+        return Boolean(detail.label?.trim() && detail.value?.trim());
+      });
+    }
+
+    if (this.sectionType === 'WORK_EXPERIENCE' || this.sectionType === 'PROJECTS') {
+      if (raw.technologiesRaw) {
+        raw.technologies = (raw.technologiesRaw as string).split(',').map((item: string) => item.trim()).filter(Boolean);
+        delete raw.technologiesRaw;
+      }
+    }
+
     this.formSubmitted.emit(raw);
   }
 
   // ── Form builders ───────────────────────
   private buildForm(): FormGroup {
     const hasBullets = ['WORK_EXPERIENCE', 'EDUCATION', 'PROJECTS', 'VOLUNTEER'].includes(this.sectionType);
+    const hasCustomDetails = ['WORK_EXPERIENCE', 'PROJECTS'].includes(this.sectionType);
 
     const base: Record<string, unknown> = hasBullets
       ? { bullets: this.fb.array([this.fb.control('')]) }
       : {};
 
+    if (hasCustomDetails) {
+      base['customDetails'] = this.fb.array([this.createDetailGroup()]);
+    }
+
     const fields: Record<SectionType, Record<string, unknown>> = {
-      WORK_EXPERIENCE:  { company: ['', Validators.required], title: ['', Validators.required], location: [''], startDate: ['', Validators.required], endDate: [''], current: [false] },
+      WORK_EXPERIENCE:  { company: ['', Validators.required], title: ['', Validators.required], location: [''], summary: [''], technologiesRaw: [''], startDate: ['', Validators.required], endDate: [''], current: [false] },
       EDUCATION:        { school: ['', Validators.required], degree: ['', Validators.required], field: [''], gpa: [''], startDate: [''], endDate: [''] },
       SKILLS:           { category: ['', Validators.required], skillsRaw: ['', Validators.required] },
-      PROJECTS:         { name: ['', Validators.required], url: [''], startDate: [''], endDate: [''], current: [false] },
+      PROJECTS:         { name: ['', Validators.required], url: [''], summary: [''], technologiesRaw: [''], startDate: [''], endDate: [''], current: [false] },
       CERTIFICATIONS:   { name: ['', Validators.required], issuer: [''], date: [''], url: [''] },
       AWARDS:           { title: ['', Validators.required], issuer: [''], date: [''], description: [''] },
       LANGUAGES:        { language: ['', Validators.required], proficiency: [''] },
@@ -349,6 +424,28 @@ export class InstanceFormComponent implements OnInit {
       (data as Record<string, unknown>)['skillsRaw'] = (data['skills'] as string[]).join(', ');
     }
 
+    if (this.supportsCustomDetails && Array.isArray(data['customDetails'])) {
+      const details = data['customDetails'] as Array<{ label?: string; value?: string }>;
+      while (this.customDetailsArray.length < details.length) {
+        this.customDetailsArray.push(this.createDetailGroup());
+      }
+      this.customDetailsArray.patchValue(details);
+    }
+
+    if (this.sectionType === 'WORK_EXPERIENCE' || this.sectionType === 'PROJECTS') {
+      const technologies = data['technologies'];
+      if (Array.isArray(technologies)) {
+        (data as Record<string, unknown>)['technologiesRaw'] = technologies.join(', ');
+      }
+    }
+
     this.form.patchValue(data);
+  }
+
+  private createDetailGroup(): FormGroup {
+    return this.fb.group({
+      label: [''],
+      value: [''],
+    });
   }
 }

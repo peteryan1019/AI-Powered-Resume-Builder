@@ -1,15 +1,17 @@
 .instance-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 0.75rem;
-  padding: 0.6rem;
-  border: 1px solid #eee;
-  border-radius: 6px;
+  padding: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .instance-icon {
-  color: #2b4bde;
+  color: #cfd8ff;
   font-size: 1.1rem;
+  margin-top: 0.1rem;
 }
 
 .instance-info {
@@ -18,13 +20,15 @@
 }
 
 .instance-title {
-  font-size: 0.9rem;
-  font-weight: 500;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #f4f6ff;
 }
 
 .instance-sub {
-  font-size: 0.8rem;
-  color: #888;
+  font-size: 0.82rem;
+  color: rgba(244, 246, 255, 0.58);
+  line-height: 1.45;
 }
 
 .instance-actions {
@@ -34,18 +38,18 @@
 
 .btn-icon {
   border: none;
-  background: none;
-  color: #666;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(244, 246, 255, 0.7);
   cursor: pointer;
-  padding: 0.25rem;
-  border-radius: 4px;
+  padding: 0.45rem;
+  border-radius: 999px;
 
   &:hover {
-    background: #f2f2f2;
+    background: rgba(255, 255, 255, 0.08);
   }
 
   &.danger:hover {
-    background: #fdecec;
-    color: #d33;
+    background: rgba(255, 180, 180, 0.12);
+    color: #ffb4b4;
   }
 }

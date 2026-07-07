@@ -1,8 +1,19 @@
 <section class="templates-page">
-  <h1>Resume Templates</h1>
+  <div class="templates-hero">
+    <p class="eyebrow">Templates</p>
+    <h1>Preview layouts before you export.</h1>
+    <p>
+      Compare resume structures side by side, then pick one to carry straight into Tailor.
+    </p>
+  </div>
 
   <div class="templates-list">
     <article class="template-card" *ngFor="let template of templates">
+      <div class="template-card-header">
+        <p class="template-tag">{{ template.highlight }}</p>
+        <span class="template-badge" *ngIf="selectedTemplateId() === template.id">Selected</span>
+      </div>
+
       <div class="viewer-wrap">
         <!-- iframe preview (some browsers render PDFs inline) -->
         <iframe class="viewer" [src]="template.safeUrl" title="{{ template.title }}"></iframe>
@@ -13,6 +24,7 @@
         <p>{{ template.description }}</p>
 
         <div class="card-actions">
+          <button type="button" class="button" (click)="selectTemplate(template.id)">Select Template</button>
           <a class="button" [href]="template.pdfPath" target="_blank" rel="noopener">Open PDF</a>
           <a class="button outline" [href]="template.pdfPath" download>Download</a>
         </div>

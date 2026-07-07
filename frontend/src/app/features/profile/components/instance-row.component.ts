@@ -65,7 +65,7 @@ export class InstanceRowComponent {
 
     switch (this.sectionType) {
       case 'WORK_EXPERIENCE':
-        return [d['company'], d['location'], dateRange(d['startDate'], d['endDate'], !!d['current'])]
+        return [d['company'], d['location'], d['summary'], dateRange(d['startDate'], d['endDate'], !!d['current'])]
           .filter(Boolean).join(' · ');
       case 'EDUCATION':
         return [d['school'], dateRange(d['startDate'], d['endDate'])].filter(Boolean).join(' · ');
@@ -74,7 +74,7 @@ export class InstanceRowComponent {
           ? (this.instance.data['skills'] as string[]).join(', ')
           : '';
       case 'PROJECTS':
-        return dateRange(d['startDate'], d['endDate'], !!d['current']);
+        return [d['summary'], dateRange(d['startDate'], d['endDate'], !!d['current'])].filter(Boolean).join(' · ');
       case 'CERTIFICATIONS':
         return [d['issuer'], d['date']].filter(Boolean).join(' · ');
       case 'AWARDS':

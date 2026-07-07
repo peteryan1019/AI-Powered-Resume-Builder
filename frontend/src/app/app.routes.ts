@@ -3,10 +3,14 @@ import { ResumeTemplatesPage } from './resume-templates-page/resume-templates-pa
 import { HomePage } from './home-page/home-page';
 import { ProfileSetupComponent } from './features/profile/profile-setup.component';
 import { TailorPage } from './tailor-page/tailor-page';
+import { AuthPage } from './auth-page/auth-page';
 
 export const routes: Routes = [
   { path: '', component: HomePage },
+  { path: 'login', component: AuthPage, data: { mode: 'login' } },
+  { path: 'signup', component: AuthPage, data: { mode: 'signup' } },
   { path: 'profile', component: ProfileSetupComponent },
+  { path: 'tailor', component: TailorPage },
   { path: 'resume-templates', component: ResumeTemplatesPage },
   { path: '**', redirectTo: '' }
 ];

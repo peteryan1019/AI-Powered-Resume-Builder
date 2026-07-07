@@ -1,56 +1,10 @@
-.container {
-  font-family: Arial, sans-serif;
-  max-width: 600px;
-  margin: 40px auto;
-  padding: 20px;
-  text-align: center;
-}
-
-// Blue Title Style
-.welcome-title {
-  color: #0066cc; 
-  font-size: 2rem;
-  margin-bottom: 24px;
-}
-
-// Interactive Button Style
-.add-user-btn {
-  background-color: #0066cc;
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  font-size: 1rem;
-  border-radius: 5px;
-  cursor: pointer;
-  transition: background 0.2s ease;
-
-  &:hover {
-    background-color: #004d99;
-  }
-}
-
-// User Counter Box Style
-.counter-box {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: #f4f6f9;
-  border: 1px solid #dcdfe6;
-  border-radius: 8px;
-  display: inline-block;
-  min-width: 200px;
-}
-
-.counter-label {
+:host {
   display: block;
-  font-size: 0.85rem;
-  color: #606266;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  min-height: 100vh;
 }
 
-.counter-number {
-  font-size: 2.5rem;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-top: 5px;
+.app-content {
+  width: min(1180px, calc(100vw - 2.5rem));
+  margin: 1.25rem auto 0;
+  padding-bottom: 2rem;
 }

@@ -1,6 +1,9 @@
 import { CommonModule } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+
+import { ResumeTemplate, ResumeTemplateService } from '../features/template-selection/resume-template.service';
 
 @Component({
   selector: 'app-resume-templates-page',
@@ -10,25 +13,22 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
   styleUrl: './resume-templates-page.scss'
 })
 export class ResumeTemplatesPage {
-  templates: Array<{ title: string; description: string; pdfPath: string; safeUrl?: SafeResourceUrl }> = [
-    {
-      title: 'Template 1',
-      description: 'Classic layout for technical and professional roles.',
-      pdfPath: '/assets/Peter_Yan_Resume_Thales.pdf'
-    },
-    {
-      title: 'Template 2',
-      description: 'A second placeholder version using the same PDF for now.',
-      pdfPath: '/assets/Peter_Yan_Resume_Thales.pdf'
-    },
-    {
-      title: 'Template 3',
-      description: 'Another placeholder template entry.',
-      pdfPath: '/assets/Peter_Yan_Resume_Thales.pdf'
-    }
-  ];
+  private readonly router = inject(Router);
+  private readonly templateLibrary = inject(ResumeTemplateService);
+
+  readonly selectedTemplateId = this.templateLibrary.selectedTemplateId;
+
+  templates: Array<ResumeTemplate & { safeUrl?: SafeResourceUrl }> = this.templateLibrary.templates;
 
   constructor(private sanitizer: DomSanitizer) {
-    this.templates = this.templates.map(t => ({ ...t, safeUrl: this.sanitizer.bypassSecurityTrustResourceUrl(t.pdfPath) }));
+    this.templates = this.templateLibrary.templates.map((template) => ({
+      ...template,
+      safeUrl: this.sanitizer.bypassSecurityTrustResourceUrl(template.pdfPath)
+    }));
+  }
+
+  selectTemplate(templateId: string): void {
+    this.templateLibrary.selectTemplate(templateId);
+    this.router.navigateByUrl('/tailor');
   }
 }

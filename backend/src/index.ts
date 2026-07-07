@@ -8,6 +8,7 @@ import cors from 'cors';
 import userRouter from './routes/user_routes.ts';
 import authSession from "./auth/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
+import { LocalAuthError, loginLocalUser, signupLocalUser } from './lib/localAuth.js';
 
 import profileRouter from './routes/profile_routes.ts';
 
@@ -55,9 +56,60 @@ app.get(
     failureRedirect: `${process.env.FRONTEND_URL}/login?error=oauth`,
   }),
   (_req, res) => {
-    res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
+    res.redirect(`${process.env.FRONTEND_URL}/tailor`);
   }
 );
+
+app.post('/auth/local/signup', async (req, res, next) => {
+  try {
+    const user = await signupLocalUser({
+      email: req.body?.email,
+      password: req.body?.password,
+      name: req.body?.name,
+    });
+
+    req.login(user, (loginError) => {
+      if (loginError) {
+        next(loginError);
+        return;
+      }
+
+      res.status(201).json({ user });
+    });
+  } catch (error) {
+    if (error instanceof LocalAuthError) {
+      res.status(error.statusCode).json({ error: error.message, code: error.code });
+      return;
+    }
+
+    next(error);
+  }
+});
+
+app.post('/auth/local/login', async (req, res, next) => {
+  try {
+    const user = await loginLocalUser({
+      email: req.body?.email,
+      password: req.body?.password,
+    });
+
+    req.login(user, (loginError) => {
+      if (loginError) {
+        next(loginError);
+        return;
+      }
+
+      res.json({ user });
+    });
+  } catch (error) {
+    if (error instanceof LocalAuthError) {
+      res.status(error.statusCode).json({ error: error.message, code: error.code });
+      return;
+    }
+
+    next(error);
+  }
+});
 
 app.get("/auth/me", (req, res) => {
   if (!req.isAuthenticated()) {
