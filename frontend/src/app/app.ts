@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { JsonPipe } from '@angular/common';
@@ -7,7 +7,8 @@ import { Navbar } from './navbar/navbar';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, JsonPipe, NavBar],
+  standalone: true,
+  imports: [RouterOutlet, JsonPipe, Navbar],
   templateUrl: './app.html',
   styleUrl: './app.scss'
 })

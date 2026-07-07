@@ -1,8 +1,8 @@
 <app-navbar></app-navbar>
 
-  <!-- 2. The Interactive Button -->
-  <!-- (click)="addUser()" listens for clicks and runs the method in your app.ts -->
-     <button class="add-user-btn" (click)="addUser()" [disabled]="isLoading()">
+<!-- 2. The Interactive Button -->
+<!-- (click)="addUser()" listens for clicks and runs the method in your app.ts -->
+<button class="add-user-btn" (click)="addUser()" [disabled]="isLoading()">
   {{ isLoading() ? 'Adding...' : 'Test Add a User' }}
 </button>
 
@@ -23,7 +23,6 @@
 
 <p *ngIf="errorMessage()">{{ errorMessage() }}</p>
 
-</div>
-<main class="container">
+<!-- <main class="container">
   <router-outlet></router-outlet>
-</main>
+</main> -->
