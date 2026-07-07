@@ -10,6 +10,13 @@ const prisma = new PrismaClient({ adapter });
 const PORT = process.env.PORT || 3000;
 const router = Router();
 
+router.get('/', (req: any, res: Response) => {
+  res.json({
+    message: 'Protected users route works',
+    user: req.user,
+  });
+});
+
 // Endpoint to fetch the total number of users
 router.get('/count', async (req: Request, res: Response) => {
   try {
