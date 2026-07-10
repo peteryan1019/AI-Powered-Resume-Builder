@@ -18,7 +18,9 @@
 
 			<div class="action-row">
 				<button type="button" class="primary-action" (click)="buildResume()">Build Resume</button>
-				<a class="secondary-action" routerLink="/resume-templates">Browse templates</a>
+				<button type="button" class="secondary-action" (click)="startCheckout('view_templates', '/resume-templates')">
+					Browse templates
+				</button>
 			</div>
 
 			<p class="status" *ngIf="buildMessage">{{ buildMessage }}</p>
@@ -52,7 +54,9 @@
 			</div>
 
 			<div class="template-footer">
-				<a routerLink="/resume-templates">Choose a different template</a>
+				<button type="button" (click)="startCheckout('view_templates', '/resume-templates')">
+					Choose a different template
+				</button>
 				<span>Selection syncs across the app.</span>
 			</div>
 		</aside>

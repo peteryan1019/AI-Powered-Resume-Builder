@@ -12,6 +12,10 @@ import { LocalAuthError, loginLocalUser, signupLocalUser } from './lib/localAuth
 
 import profileRouter from './routes/profile_routes.ts';
 
+import paymentRouter, { stripeWebhook } from './routes/payment_routes.js';
+
+
+
 dotenv.config();
 
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
@@ -20,8 +24,17 @@ const app = express();
 const prisma = new PrismaClient({ adapter });
 const PORT = process.env.PORT || 3000;
 
+function safeClientPath(value: unknown): string {
+  const path = typeof value === 'string' ? value : '/tailor';
+  return path.startsWith('/') && !path.startsWith('//') ? path : '/tailor';
+}
+
+function safeCheckoutAction(value: unknown): string | null {
+  return typeof value === 'string' && /^[a-z0-9_:-]{1,80}$/i.test(value) ? value : null;
+}
 
 app.use(cors({ origin: 'http://localhost:4200', credentials: true}));
+app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
 app.use(express.json());
 
 app.use(
@@ -45,9 +58,22 @@ app.use('/api/users', requireAuth, userRouter);
 
 app.get(
   "/auth/google",
-  authSession.authenticate("google", {
-    scope: ["profile", "email"],
-  })
+  (req, res, next) => {
+    const returnTo = safeClientPath(req.query.returnUrl);
+    const checkoutAction = safeCheckoutAction(req.query.checkoutAction);
+
+    (req.session as any).returnTo = returnTo;
+
+    if (checkoutAction) {
+      (req.session as any).checkoutAction = checkoutAction;
+    } else {
+      delete (req.session as any).checkoutAction;
+    }
+
+    authSession.authenticate("google", {
+      scope: ["profile", "email"],
+    })(req, res, next);
+  }
 );
 
 app.get(
@@ -55,8 +81,20 @@ app.get(
   authSession.authenticate("google", {
     failureRedirect: `${process.env.FRONTEND_URL}/login?error=oauth`,
   }),
-  (_req, res) => {
-    res.redirect(`${process.env.FRONTEND_URL}/tailor`);
+  (req, res) => {
+    const returnTo = safeClientPath((req.session as any).returnTo);
+    const checkoutAction = safeCheckoutAction((req.session as any).checkoutAction);
+
+    delete (req.session as any).returnTo;
+    delete (req.session as any).checkoutAction;
+
+    if (checkoutAction) {
+      const params = new URLSearchParams({ returnTo, checkoutAction });
+      res.redirect(`${process.env.FRONTEND_URL}/payment/start?${params.toString()}`);
+      return;
+    }
+
+    res.redirect(`${process.env.FRONTEND_URL}${returnTo}`);
   }
 );
 
@@ -131,5 +169,7 @@ app.post("/auth/logout", (req, res, next) => {
 });
 
 app.use('/api/profile', profileRouter);
+
+app.use('/api/payments', requireAuth, paymentRouter);
 
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));

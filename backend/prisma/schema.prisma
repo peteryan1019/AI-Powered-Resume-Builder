@@ -23,11 +23,35 @@ model User {
   googleid  String?  @unique
   name      String?
   avatarUrl String?
+  stripeCustomerId String?
+  payments Payment[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  profile             Profile?
+  profile Profile?
   localAuthCredential LocalAuthCredential?
+}
+
+model Payment {
+  id String @id @default(uuid())
+  userId String
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  action String
+  returnTo String
+  stripeCheckoutSessionId String @unique
+  stripePaymentIntentId String?
+  status PaymentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  paidAt DateTime?
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELED
 }
 
 model LocalAuthCredential {

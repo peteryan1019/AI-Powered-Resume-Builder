@@ -4,6 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AuthService } from '../features/auth/auth.service';
+import { PaymentService } from '../features/payments/payment.service';
 
 @Component({
   selector: 'app-auth-page',
@@ -16,9 +17,12 @@ export class AuthPage {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
+  private readonly payment = inject(PaymentService);
 
   readonly auth = inject(AuthService);
   readonly isSignup = this.route.snapshot.data['mode'] === 'signup';
+  readonly returnUrl = this.safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl'));
+  readonly checkoutAction = this.safeCheckoutAction(this.route.snapshot.queryParamMap.get('checkoutAction'));
   readonly isSubmitting = signal(false);
   readonly statusMessage = signal<string | null>(this.getInitialStatusMessage());
 
@@ -42,6 +46,10 @@ export class AuthPage {
     this.isSignup ? 'Already have an account? Sign in' : 'Need an account? Sign up',
   );
   readonly switchRoute = computed(() => (this.isSignup ? '/login' : '/signup'));
+  readonly switchQueryParams = computed(() => ({
+    returnUrl: this.returnUrl,
+    ...(this.checkoutAction ? { checkoutAction: this.checkoutAction } : {}),
+  }));
 
   submit(): void {
     if (this.form.invalid || this.isSubmitting()) {
@@ -65,9 +73,9 @@ export class AuthPage {
         });
 
     request$.subscribe({
-      next: async () => {
+      next: () => {
         this.isSubmitting.set(false);
-        await this.router.navigateByUrl('/tailor');
+        this.continueAfterAuth();
       },
       error: (error) => {
         this.isSubmitting.set(false);
@@ -77,7 +85,20 @@ export class AuthPage {
   }
 
   googleLogin(): void {
-    this.auth.signInWithGoogle();
+    this.auth.signInWithGoogle(this.returnUrl, this.checkoutAction ?? undefined);
+  }
+
+  private continueAfterAuth(): void {
+    if (this.checkoutAction) {
+      this.payment.startCheckout(this.checkoutAction, this.returnUrl).subscribe({
+        error: (error) => {
+          this.statusMessage.set(error?.error?.error ?? 'Unable to start checkout right now.');
+        },
+      });
+      return;
+    }
+
+    void this.router.navigateByUrl(this.returnUrl);
   }
 
   private getInitialStatusMessage(): string | null {
@@ -88,5 +109,13 @@ export class AuthPage {
     }
 
     return null;
+  }
+
+  private safeReturnUrl(value: string | null): string {
+    return value?.startsWith('/') && !value.startsWith('//') ? value : '/tailor';
+  }
+
+  private safeCheckoutAction(value: string | null): string | null {
+    return value && /^[a-z0-9_:-]{1,80}$/i.test(value) ? value : null;
   }
 }

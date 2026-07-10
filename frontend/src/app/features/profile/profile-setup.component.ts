@@ -9,6 +9,7 @@ import { BasicInfoFormComponent } from './components/basic-info-form.component';
 import { SectionCardComponent } from './components/section-card.component';
 import { ResumeUploadBannerComponent } from './components/resume-upload-banner.component';
 
+
 @Component({
   selector: 'app-profile-setup',
   standalone: true,

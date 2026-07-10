@@ -31,8 +31,19 @@ export class AuthService {
     );
   }
 
-  signInWithGoogle(): void {
-    window.location.assign(`${AUTH_API}/google`);
+  signInWithGoogle(returnUrl?: string, checkoutAction?: string): void {
+    const params = new URLSearchParams();
+
+    if (returnUrl) {
+      params.set('returnUrl', returnUrl);
+    }
+
+    if (checkoutAction) {
+      params.set('checkoutAction', checkoutAction);
+    }
+
+    const query = params.toString();
+    window.location.assign(`${AUTH_API}/google${query ? `?${query}` : ''}`);
   }
 
   signIn(credentials: AuthCredentials): Observable<AuthUser> {

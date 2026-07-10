@@ -1,18 +1,19 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 
+import { PaymentService } from '../features/payments/payment.service';
 import { ResumeTemplateService } from '../features/template-selection/resume-template.service';
 
 @Component({
   selector: 'app-tailor-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
   templateUrl: './tailor-page.html',
   styleUrl: './tailor-page.scss',
 })
 export class TailorPage {
+  private readonly payment = inject(PaymentService);
   private readonly templateLibrary = inject(ResumeTemplateService);
 
   readonly templates = this.templateLibrary.templates;
@@ -28,6 +29,10 @@ export class TailorPage {
 
   openSelectedTemplate(): void {
     window.open(this.selectedTemplate().pdfPath, '_blank', 'noopener');
+  }
+
+  startCheckout(action: string, returnTo: string): void {
+    this.payment.startCheckout(action, returnTo).subscribe();
   }
 
   buildResume(): void {
@@ -47,6 +52,11 @@ export class TailorPage {
     }
 
     const template = this.selectedTemplate();
-    this.buildMessage = `Ready to tailor ${template.title} for ${parsedUrl.hostname}. This is where the resume generation flow will start.`;
+    this.buildMessage = `Preparing checkout for ${template.title} and ${parsedUrl.hostname}.`;
+    this.payment.startCheckout('tailor_resume', '/tailor').subscribe({
+      error: (error) => {
+        this.buildMessage = error?.error?.error ?? 'Unable to start checkout right now.';
+      },
+    });
   }
 }

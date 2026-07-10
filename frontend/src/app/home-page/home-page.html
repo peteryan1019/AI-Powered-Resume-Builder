@@ -8,9 +8,15 @@
       </p>
 
       <div class="hero-actions">
-        <a class="primary-link" routerLink="/profile">Set up profile</a>
-        <a class="secondary-link" routerLink="/resume-templates">View templates</a>
-        <a class="secondary-link" routerLink="/tailor">Tailor a resume</a>
+        <button type="button" class="primary-link" (click)="startCheckout('profile_setup', '/profile')">
+          Set up profile
+        </button>
+        <button type="button" class="secondary-link" (click)="startCheckout('view_templates', '/resume-templates')">
+          View templates
+        </button>
+        <button type="button" class="secondary-link" (click)="startCheckout('tailor_resume', '/tailor')">
+          Tailor a resume
+        </button>
       </div>
     </div>
 

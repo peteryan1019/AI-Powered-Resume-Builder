@@ -1,8 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
+import { PaymentService } from '../features/payments/payment.service';
 import { ResumeTemplate, ResumeTemplateService } from '../features/template-selection/resume-template.service';
 
 @Component({
@@ -13,7 +13,7 @@ import { ResumeTemplate, ResumeTemplateService } from '../features/template-sele
   styleUrl: './resume-templates-page.scss'
 })
 export class ResumeTemplatesPage {
-  private readonly router = inject(Router);
+  private readonly payment = inject(PaymentService);
   private readonly templateLibrary = inject(ResumeTemplateService);
 
   readonly selectedTemplateId = this.templateLibrary.selectedTemplateId;
@@ -29,6 +29,6 @@ export class ResumeTemplatesPage {
 
   selectTemplate(templateId: string): void {
     this.templateLibrary.selectTemplate(templateId);
-    this.router.navigateByUrl('/tailor');
+    this.payment.startCheckout('tailor_resume', '/tailor').subscribe();
   }
 }

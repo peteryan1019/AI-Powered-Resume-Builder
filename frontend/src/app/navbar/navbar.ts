@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 
 import { AuthService } from '../features/auth/auth.service';
+import { PaymentService } from '../features/payments/payment.service';
 
 @Component({
   selector: 'app-navbar',
@@ -13,6 +14,7 @@ import { AuthService } from '../features/auth/auth.service';
 
 export class Navbar implements OnInit {
   readonly auth = inject(AuthService);
+  private readonly payment = inject(PaymentService);
 
   ngOnInit(): void {
     this.auth.loadSession().subscribe();
@@ -20,6 +22,10 @@ export class Navbar implements OnInit {
 
   googleLogin(): void {
     this.auth.signInWithGoogle();
+  }
+
+  startCheckout(action: string, returnTo: string): void {
+    this.payment.startCheckout(action, returnTo).subscribe();
   }
 
   logout(): void {
@@ -30,4 +36,3 @@ export class Navbar implements OnInit {
     });
   }
 }
-

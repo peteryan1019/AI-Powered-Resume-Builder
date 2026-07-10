@@ -7,9 +7,9 @@
   <div class="nav-center">
     <ul class="nav-links">
       <li><a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">Home</a></li>
-      <li><a routerLink="/profile" routerLinkActive="active">Profile</a></li>
-      <li><a routerLink="/tailor" routerLinkActive="active">Tailor</a></li>
-      <li><a routerLink="/resume-templates" routerLinkActive="active">Resume templates</a></li>
+      <li><button type="button" (click)="startCheckout('profile_setup', '/profile')">Profile</button></li>
+      <li><button type="button" (click)="startCheckout('tailor_resume', '/tailor')">Tailor</button></li>
+      <li><button type="button" (click)="startCheckout('view_templates', '/resume-templates')">Resume templates</button></li>
     </ul>
   </div>
 
