@@ -84,6 +84,66 @@
   gap: 1rem;
 }
 
+.section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-drag-item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.section-drag-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.drag-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(244, 246, 255, 0.4);
+  cursor: grab;
+  transition: background-color 160ms ease, color 160ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(244, 246, 255, 0.75);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+// While dragging: the floating copy follows the cursor.
+.cdk-drag-preview {
+  box-shadow: 0 24px 60px rgba(3, 5, 15, 0.4);
+  border-radius: 24px;
+}
+
+// The gap left behind at the drop target.
+.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+// Smoothly animate the other items sliding out of the way.
+.cdk-drag-animating {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.section-list.cdk-drop-list-dragging .section-drag-item:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
 .page-header {
   padding: 1.15rem 1.35rem;
   border-radius: 24px;

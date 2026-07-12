@@ -1,37 +1,19 @@
 // backend/src/routes/profile.routes.ts
 
 import { Router, type Request, type Response } from 'express';
-import { PrismaClient } from '../../generated/prisma/client.js';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
-import 'dotenv/config';
+import prisma from '../lib/prisma.js';
+import { buildHeaders, formatInstance } from '../lib/profileExport.js';
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
 const router = Router();
 
-// Temp: hardcode userId for testing before Prithvi's auth is ready.
-// Replace with: const userId = req.user!.id;
-const DEV_USER_ID = 'dev-user-1';
-
-// Profile.userId has a FK constraint against User.id, so the dev user
-// must actually exist before any profile row can reference it.
-router.use(async (_req: Request, _res: Response, next) => {
-  await prisma.user.upsert({
-    where: { id: DEV_USER_ID },
-    update: {},
-    create: { id: DEV_USER_ID, email: 'dev-user@example.com', name: 'Dev User' },
-  });
-  next();
-});
-
 // ─────────────────────────────────────────
-// GET /api/profile
+// GET /api/profile/export
+// Flattened shape for AI/tailor consumption. Must be defined before
+// the plain GET '/' so it's not swallowed by any future '/:id' route.
 // ─────────────────────────────────────────
-router.get('/', async (req: Request, res: Response) => {
+router.get('/export', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
 
     const profile = await prisma.profile.findUnique({
       where: { userId },
@@ -45,7 +27,44 @@ router.get('/', async (req: Request, res: Response) => {
       },
     });
 
-    return res.json({ profile: profile ?? null });
+    const sections = (profile?.sections ?? []).flatMap((section) =>
+      section.instances.map((instance) => formatInstance(section.type, instance))
+    );
+
+    return res.json({
+      headers: buildHeaders(req.user!, profile),
+      sections,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: 'Failed to export profile' });
+  }
+});
+
+// ─────────────────────────────────────────
+// GET /api/profile
+// ─────────────────────────────────────────
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+
+    const profile = await prisma.profile.findUnique({
+      where: { userId },
+      include: {
+        sections: {
+          orderBy: { order: 'asc' },
+          include: {
+            instances: { orderBy: { order: 'asc' } },
+          },
+        },
+      },
+    });
+
+    // name/email live on User, not Profile — the basic-info form shows
+    // them read-only, so surface them alongside the profile here.
+    const { name, email, avatarUrl } = req.user!;
+
+    return res.json({ profile: profile ?? null, user: { name, email, avatarUrl } });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to fetch profile' });
@@ -58,7 +77,7 @@ router.get('/', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 router.put('/', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { headline, phone, location, summary, linkedin, github, portfolio } = req.body;
 
     const profile = await prisma.profile.upsert({
@@ -81,7 +100,7 @@ router.put('/', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 router.post('/resume', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { resumeUrl, resumeFileName } = req.body;
 
     const profile = await prisma.profile.upsert({
@@ -102,7 +121,7 @@ router.post('/resume', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 router.post('/sections', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { type, label } = req.body;
 
     const validTypes = [
@@ -145,7 +164,7 @@ router.post('/sections', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 router.delete('/sections/:sectionId', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { sectionId } = req.params;
 
     const section = await prisma.profileSection.findFirst({
@@ -169,7 +188,7 @@ router.delete('/sections/:sectionId', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 router.put('/sections/reorder', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { sections } = req.body as { sections: { id: string; order: number }[] };
 
     await prisma.$transaction(
@@ -193,7 +212,7 @@ router.put('/sections/reorder', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 router.post('/sections/:sectionId/instances', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { sectionId } = req.params;
     const { data } = req.body;
 
@@ -225,7 +244,7 @@ router.post('/sections/:sectionId/instances', async (req: Request, res: Response
 // ─────────────────────────────────────────
 router.put('/sections/:sectionId/instances/:instanceId', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { sectionId, instanceId } = req.params;
     const { data } = req.body;
 
@@ -253,7 +272,7 @@ router.put('/sections/:sectionId/instances/:instanceId', async (req: Request, re
 // ─────────────────────────────────────────
 router.delete('/sections/:sectionId/instances/:instanceId', async (req: Request, res: Response) => {
   try {
-    const userId = DEV_USER_ID;
+    const userId = req.user!.id;
     const { sectionId, instanceId } = req.params;
 
     const instance = await prisma.profileInstance.findFirst({

@@ -28,6 +28,14 @@ export interface ProfileSection {
   instances: ProfileInstance[];
 }
 
+// name/email/avatar come from the User table (populated by auth),
+// returned alongside the profile and shown read-only in the form.
+export interface ProfileUser {
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+}
+
 export interface Profile {
   id: string;
   userId: string;

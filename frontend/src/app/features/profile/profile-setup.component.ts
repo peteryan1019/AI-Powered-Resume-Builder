@@ -3,6 +3,7 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { ProfileService } from './profile.service';
 import { Profile, SectionType, SECTION_CONFIG } from './profile.types';
 import { BasicInfoFormComponent } from './components/basic-info-form.component';
@@ -15,6 +16,7 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
   imports: [
     CommonModule,
     FormsModule,
+    DragDropModule,
     BasicInfoFormComponent,
     SectionCardComponent,
     ResumeUploadBannerComponent,
@@ -90,20 +92,32 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
         <app-basic-info-form
           *ngIf="profile() !== undefined"
           [profile]="profile()"
+          [user]="user()"
           [saveStatus]="basicInfoSaveStatus()"
           (saved)="onBasicInfoSaved($event)"
         />
 
-        <!-- Section cards -->
-        <app-section-card
-          *ngFor="let section of profile()?.sections"
-          [id]="'section-' + section.id"
-          [section]="section"
-          (instanceAdded)="onInstanceAdded(section.id, $event)"
-          (instanceUpdated)="onInstanceUpdated(section.id, $event.id, $event.data)"
-          (instanceDeleted)="onInstanceDeleted(section.id, $event)"
-          (sectionDeleted)="onSectionDeleted(section.id)"
-        />
+        <!-- Section cards (drag to reorder) -->
+        <div class="section-list" cdkDropList (cdkDropListDropped)="onSectionDrop($event)">
+          <div
+            class="section-drag-item"
+            *ngFor="let section of profile()?.sections"
+            cdkDrag
+            [id]="'section-' + section.id"
+          >
+            <button class="drag-handle" cdkDragHandle type="button" title="Drag to reorder">
+              <i class="ti ti-grip-vertical"></i>
+            </button>
+            <app-section-card
+              class="section-drag-card"
+              [section]="section"
+              (instanceAdded)="onInstanceAdded(section.id, $event)"
+              (instanceUpdated)="onInstanceUpdated(section.id, $event.id, $event.data)"
+              (instanceDeleted)="onInstanceDeleted(section.id, $event)"
+              (sectionDeleted)="onSectionDeleted(section.id)"
+            />
+          </div>
+        </div>
 
         <!-- Empty state -->
         <div *ngIf="profile()?.sections?.length === 0" class="empty-sections">
@@ -123,6 +137,7 @@ export class ProfileSetupComponent implements OnInit {
   // A signal (not a plain property) so updates arriving from async HTTP
   // callbacks are picked up by zoneless change detection.
   profile!: ProfileService['profile'];
+  user!: ProfileService['user'];
   isParsing = signal(false);
   showAddSectionForm = signal(false);
   addSectionError = signal<string | null>(null);
@@ -136,6 +151,7 @@ export class ProfileSetupComponent implements OnInit {
 
   constructor(private profileService: ProfileService) {
     this.profile = this.profileService.profile;
+    this.user = this.profileService.user;
   }
 
   ngOnInit(): void {
@@ -179,6 +195,13 @@ export class ProfileSetupComponent implements OnInit {
 
   onSectionDeleted(sectionId: string): void {
     this.profileService.deleteSection(sectionId).subscribe();
+  }
+
+  onSectionDrop(event: CdkDragDrop<unknown>): void {
+    // Service updates local order optimistically; reload to roll back on failure.
+    this.profileService.moveSection(event.previousIndex, event.currentIndex).subscribe({
+      error: () => this.profileService.loadProfile().subscribe(),
+    });
   }
 
   openAddSectionModal(): void {

@@ -130,6 +130,6 @@ app.post("/auth/logout", (req, res, next) => {
   });
 });
 
-app.use('/api/profile', profileRouter);
+app.use('/api/profile', requireAuth, profileRouter);
 
 app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));

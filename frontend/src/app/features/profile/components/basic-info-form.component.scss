@@ -68,6 +68,12 @@
     color: rgba(244, 246, 255, 0.7);
   }
 
+  .field-lock {
+    font-size: 0.7rem;
+    color: rgba(244, 246, 255, 0.4);
+    font-weight: 400;
+  }
+
   input,
   textarea {
     padding: 0.75rem 0.85rem;
@@ -76,6 +82,12 @@
     font-size: 0.92rem;
     background: rgba(7, 9, 23, 0.72);
     color: #f4f6ff;
+  }
+
+  input[readonly] {
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(244, 246, 255, 0.6);
+    cursor: not-allowed;
   }
 }
 
