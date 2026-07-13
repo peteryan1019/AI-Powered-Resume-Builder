@@ -39,15 +39,6 @@ export class ProfileService {
     );
   }
 
-  // Resume upload
-  uploadResume(file: File): Observable<{ profile: Profile; message: string }> {
-    const form = new FormData();
-    form.append('resume', file);
-    return this.http.post<{ profile: Profile; message: string }>(`${API}/resume`, form, { withCredentials: true });
-    // NOTE: after upload, AI parsing result arrives via WebSocket (Prithvi)
-    // and will call loadProfile() to refresh state when done.
-  }
-
   // Sections
   addSection(type: SectionType, label: string): Observable<{ section: ProfileSection }> {
     return this.http.post<{ section: ProfileSection }>(`${API}/sections`, { type, label }, { withCredentials: true }).pipe(

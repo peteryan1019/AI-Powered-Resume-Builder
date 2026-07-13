@@ -45,11 +45,11 @@ import { SectionType } from '../profile.types';
           </div>
           <div class="form-row">
             <div class="field-group">
-              <label>Start date *</label>
+              <label>Start date (month and year) *</label>
               <input formControlName="startDate" type="month" />
             </div>
             <div class="field-group" *ngIf="!form.get('current')?.value">
-              <label>End date</label>
+              <label>End date (month and year)</label>
               <input formControlName="endDate" type="month" />
             </div>
             <div class="field-group checkbox-group">
@@ -86,11 +86,11 @@ import { SectionType } from '../profile.types';
           </div>
           <div class="form-row">
             <div class="field-group">
-              <label>Start date</label>
+              <label>Start date (month and year)</label>
               <input formControlName="startDate" type="month" />
             </div>
             <div class="field-group">
-              <label>End date</label>
+              <label>End date (month and year)</label>
               <input formControlName="endDate" type="month" />
             </div>
           </div>
@@ -135,11 +135,11 @@ import { SectionType } from '../profile.types';
           </div>
           <div class="form-row">
             <div class="field-group">
-              <label>Start date</label>
+              <label>Start date (month and year)</label>
               <input formControlName="startDate" type="month" />
             </div>
             <div class="field-group" *ngIf="!form.get('current')?.value">
-              <label>End date</label>
+              <label>End date (month and year)</label>
               <input formControlName="endDate" type="month" />
             </div>
             <div class="field-group checkbox-group">
@@ -167,7 +167,7 @@ import { SectionType } from '../profile.types';
           </div>
           <div class="form-row">
             <div class="field-group">
-              <label>Date</label>
+              <label>Date (month and year)</label>
               <input formControlName="date" type="month" />
             </div>
             <div class="field-group">
@@ -191,7 +191,7 @@ import { SectionType } from '../profile.types';
           </div>
           <div class="form-row">
             <div class="field-group">
-              <label>Date</label>
+              <label>Date (month and year)</label>
               <input formControlName="date" type="month" />
             </div>
           </div>
@@ -236,11 +236,11 @@ import { SectionType } from '../profile.types';
           </div>
           <div class="form-row">
             <div class="field-group">
-              <label>Start date</label>
+              <label>Start date (month and year)</label>
               <input formControlName="startDate" type="month" />
             </div>
             <div class="field-group" *ngIf="!form.get('current')?.value">
-              <label>End date</label>
+              <label>End date (month and year)</label>
               <input formControlName="endDate" type="month" />
             </div>
             <div class="field-group checkbox-group">

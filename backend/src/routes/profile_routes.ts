@@ -94,29 +94,6 @@ router.put('/', async (req: Request, res: Response) => {
 });
 
 // ─────────────────────────────────────────
-// POST /api/profile/resume
-// Store resume file URL after upload.
-// AI parsing triggered async (Prithvi's side).
-// ─────────────────────────────────────────
-router.post('/resume', async (req: Request, res: Response) => {
-  try {
-    const userId = req.user!.id;
-    const { resumeUrl, resumeFileName } = req.body;
-
-    const profile = await prisma.profile.upsert({
-      where: { userId },
-      update: { resumeUrl, resumeFileName },
-      create: { userId, resumeUrl, resumeFileName },
-    });
-
-    return res.json({ profile, message: 'Resume uploaded. Parsing in progress.' });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Failed to upload resume' });
-  }
-});
-
-// ─────────────────────────────────────────
 // POST /api/profile/sections
 // ─────────────────────────────────────────
 router.post('/sections', async (req: Request, res: Response) => {
