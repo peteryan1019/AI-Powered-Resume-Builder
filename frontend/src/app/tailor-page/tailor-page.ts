@@ -1,8 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 
+import { AuthService } from '../features/auth/auth.service';
 import { PaymentService } from '../features/payments/payment.service';
+import { ResumeBuildService } from '../features/resume-build/resume-build.service';
 import { ResumeTemplateService } from '../features/template-selection/resume-template.service';
 
 @Component({
@@ -15,6 +18,11 @@ import { ResumeTemplateService } from '../features/template-selection/resume-tem
 export class TailorPage {
   private readonly payment = inject(PaymentService);
   private readonly templateLibrary = inject(ResumeTemplateService);
+  private readonly auth = inject(AuthService);
+  private readonly resumeBuild = inject(ResumeBuildService);
+  private readonly router = inject(Router);
+
+  building = false;
 
   readonly templates = this.templateLibrary.templates;
   readonly selectedTemplate = computed(() => this.templateLibrary.selectedTemplate());
@@ -51,11 +59,23 @@ export class TailorPage {
       return;
     }
 
+    const userId = this.auth.user()?.id;
+    if (!userId) {
+      this.buildMessage = 'Please sign in again before building.';
+      return;
+    }
+
     const template = this.selectedTemplate();
-    this.buildMessage = `Preparing checkout for ${template.title} and ${parsedUrl.hostname}.`;
-    this.payment.startCheckout('tailor_resume', '/tailor').subscribe({
+    this.building = true;
+    this.buildMessage = `Building ${template.title} for ${parsedUrl.hostname}...`;
+
+    this.resumeBuild.startBuild(userId).subscribe({
+      next: ({ jobId }) => {
+        void this.router.navigate(['/tailor/build', jobId]);
+      },
       error: (error) => {
-        this.buildMessage = error?.error?.error ?? 'Unable to start checkout right now.';
+        this.building = false;
+        this.buildMessage = error?.error?.error ?? 'Unable to start the resume build right now.';
       },
     });
   }

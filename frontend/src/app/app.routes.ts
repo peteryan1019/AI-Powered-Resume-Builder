@@ -7,6 +7,8 @@ import { AuthPage } from './auth-page/auth-page';
 import { authGuard } from './features/auth/auth.guard';
 import { PaymentStartPage } from './features/payments/payment-start-page';
 import { PaymentSuccessPage } from './features/payments/payment-success-page';
+import { BuildStatusPage } from './features/resume-build/build-status-page';
+import { BuildResultPage } from './features/resume-build/build-result-page';
 
 export const routes: Routes = [
   { path: '', component: HomePage },
@@ -16,6 +18,8 @@ export const routes: Routes = [
   { path: 'payment/success', component: PaymentSuccessPage, canActivate: [authGuard] },
   { path: 'profile', component: ProfileSetupComponent, canActivate: [authGuard] },
   { path: 'tailor', component: TailorPage, canActivate: [authGuard] },
+  { path: 'tailor/build/:jobId', component: BuildStatusPage, canActivate: [authGuard] },
+  { path: 'tailor/result/:jobId', component: BuildResultPage, canActivate: [authGuard] },
   { path: 'resume-templates', component: ResumeTemplatesPage, canActivate: [authGuard] },
   { path: '**', redirectTo: '' },
 ];

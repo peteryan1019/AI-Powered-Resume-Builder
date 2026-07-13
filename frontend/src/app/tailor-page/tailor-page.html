@@ -17,7 +17,9 @@
 			</label>
 
 			<div class="action-row">
-				<button type="button" class="primary-action" (click)="buildResume()">Build Resume</button>
+				<button type="button" class="primary-action" [disabled]="building" (click)="buildResume()">
+					{{ building ? 'Building…' : 'Build Resume' }}
+				</button>
 				<button type="button" class="secondary-action" (click)="startCheckout('view_templates', '/resume-templates')">
 					Browse templates
 				</button>

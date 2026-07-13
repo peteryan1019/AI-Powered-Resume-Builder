@@ -6,6 +6,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import cors from 'cors';
 import userRouter from './routes/user_routes.ts';
+import resumeRouter from './routes/resume_routes.ts';
 import authSession from "./auth/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { LocalAuthError, loginLocalUser, signupLocalUser } from './lib/localAuth.js';
@@ -55,6 +56,7 @@ app.use(authSession.session());
 
 // Mount the user routes
 app.use('/api/users', requireAuth, userRouter);
+app.use('/api/users', requireAuth, resumeRouter);
 
 app.get(
   "/auth/google",
