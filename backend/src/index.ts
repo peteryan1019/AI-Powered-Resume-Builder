@@ -26,8 +26,8 @@ const prisma = new PrismaClient({ adapter });
 const PORT = process.env.PORT || 3000;
 
 function safeClientPath(value: unknown): string {
-  const path = typeof value === 'string' ? value : '/tailor';
-  return path.startsWith('/') && !path.startsWith('//') ? path : '/tailor';
+  const path = typeof value === 'string' ? value : '/home';
+  return path.startsWith('/') && !path.startsWith('//') ? path : '/home';
 }
 
 function safeCheckoutAction(value: unknown): string | null {

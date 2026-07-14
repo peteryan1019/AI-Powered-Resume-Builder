@@ -112,7 +112,7 @@ export class AuthPage {
   }
 
   private safeReturnUrl(value: string | null): string {
-    return value?.startsWith('/') && !value.startsWith('//') ? value : '/tailor';
+    return value?.startsWith('/') && !value.startsWith('//') ? value : '/home';
   }
 
   private safeCheckoutAction(value: string | null): string | null {

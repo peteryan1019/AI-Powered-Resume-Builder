@@ -55,6 +55,6 @@ export class PaymentSuccessPage implements OnInit {
   }
 
   private safeReturnTo(value: string): string {
-    return value.startsWith('/') && !value.startsWith('//') ? value : '/tailor';
+    return value.startsWith('/') && !value.startsWith('//') ? value : '/home';
   }
 }

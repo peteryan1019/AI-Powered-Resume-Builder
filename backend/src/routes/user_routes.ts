@@ -46,4 +46,23 @@ router.post('/add', async (req: Request, res: Response) => {
   }
 });
 
+router.get('/me/subscription', async (req: Request, res: Response) => {
+  const user = req.user as any;
+
+  const existingPaidPayment = await prisma.payment.findFirst({
+    where: {
+      userId: user.id,
+      status: 'PAID',
+    },
+    orderBy: {
+      paidAt: 'desc',
+    },
+  });
+
+  res.json({
+    active: Boolean(existingPaidPayment),
+    status: existingPaidPayment?.status ?? 'NONE',
+  });
+});
+
 export default router;
