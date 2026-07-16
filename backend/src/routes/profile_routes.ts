@@ -6,25 +6,26 @@ import { buildHeaders, formatInstance } from '../lib/profileExport.js';
 
 const router = Router();
 
-// ─────────────────────────────────────────
+const profileInclude = {
+  sections: {
+    orderBy: { order: 'asc' as const },
+    include: {
+      instances: { orderBy: { order: 'asc' as const } },
+    },
+  },
+};
+
 // GET /api/profile/export
 // Flattened shape for AI/tailor consumption. Must be defined before
 // the plain GET '/' so it's not swallowed by any future '/:id' route.
-// ─────────────────────────────────────────
+
 router.get('/export', async (req: Request, res: Response) => {
   try {
     const userId = req.user!.id;
 
     const profile = await prisma.profile.findUnique({
       where: { userId },
-      include: {
-        sections: {
-          orderBy: { order: 'asc' },
-          include: {
-            instances: { orderBy: { order: 'asc' } },
-          },
-        },
-      },
+      include: profileInclude,
     });
 
     const sections = (profile?.sections ?? []).flatMap((section) =>
@@ -50,14 +51,7 @@ router.get('/', async (req: Request, res: Response) => {
 
     const profile = await prisma.profile.findUnique({
       where: { userId },
-      include: {
-        sections: {
-          orderBy: { order: 'asc' },
-          include: {
-            instances: { orderBy: { order: 'asc' } },
-          },
-        },
-      },
+      include: profileInclude,
     });
 
     // name/email live on User, not Profile — the basic-info form shows
@@ -84,6 +78,7 @@ router.put('/', async (req: Request, res: Response) => {
       where: { userId },
       update: { headline, phone, location, summary, linkedin, github, portfolio },
       create: { userId, headline, phone, location, summary, linkedin, github, portfolio },
+      include: profileInclude,
     });
 
     return res.json({ profile });

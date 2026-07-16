@@ -47,7 +47,7 @@ export class ProfileService {
         if (profile) {
           this.profileSignal.set({
             ...profile,
-            sections: [...profile.sections, { ...section, instances: [] }],
+            sections: [...(profile.sections ?? []), { ...section, instances: [] }],
           });
         }
       })

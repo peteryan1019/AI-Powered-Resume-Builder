@@ -3,8 +3,10 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { ProfileService } from './profile.service';
+import { AuthService } from '../auth/auth.service';
 import { Profile, SectionType, SECTION_CONFIG } from './profile.types';
 import { BasicInfoFormComponent } from './components/basic-info-form.component';
 import { SectionCardComponent } from './components/section-card.component';
@@ -15,6 +17,7 @@ import { SectionCardComponent } from './components/section-card.component';
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
     DragDropModule,
     BasicInfoFormComponent,
     SectionCardComponent,
@@ -106,6 +109,21 @@ import { SectionCardComponent } from './components/section-card.component';
         </div>
       </div>
 
+      <!-- Before login: cover the page so nothing can be filled in;
+           clicking anywhere prompts the user to log in first. -->
+      <div
+        class="auth-overlay"
+        *ngIf="sessionChecked() && !auth.isAuthenticated()"
+        (click)="promptLogin()"
+      ></div>
+
+    </div>
+
+    <!-- Transient prompt shown when a logged-out user tries to interact. -->
+    <div class="login-toast" *ngIf="loginPromptVisible()">
+      <i class="ti ti-lock"></i>
+      <span>Please log in before filling in your profile.</span>
+      <a routerLink="/login">Log in</a>
     </div>
   `,
   styleUrls: ['./profile-setup.component.scss'],
@@ -118,18 +136,32 @@ export class ProfileSetupComponent implements OnInit {
   showAddSectionForm = signal(false);
   addSectionError = signal<string | null>(null);
   basicInfoSaveStatus = signal<'idle' | 'saved' | 'error'>('idle');
+  // False until the session check resolves, so we don't flash the login
+  // overlay before we know whether the user is actually logged in.
+  sessionChecked = signal(false);
+  loginPromptVisible = signal(false);
 
   sectionConfig = SECTION_CONFIG;
   sectionTypes = Object.keys(SECTION_CONFIG) as SectionType[];
   newSectionType: SectionType = this.sectionTypes[0];
 
-  constructor(private profileService: ProfileService) {
+  constructor(
+    private profileService: ProfileService,
+    readonly auth: AuthService,
+  ) {
     this.profile = this.profileService.profile;
     this.user = this.profileService.user;
   }
 
   ngOnInit(): void {
-    this.profileService.loadProfile().subscribe();
+    // Confirm auth first; only load the profile once we know we're logged in
+    // (avoids a guaranteed 401 and lets the template gate on auth state).
+    this.auth.loadSession().subscribe((user) => {
+      this.sessionChecked.set(true);
+      if (user) {
+        this.profileService.loadProfile().subscribe();
+      }
+    });
   }
 
   onBasicInfoSaved(data: Partial<Profile>): void {
@@ -181,8 +213,15 @@ export class ProfileSetupComponent implements OnInit {
       next: () => {
         this.showAddSectionForm.set(false);
       },
-      error: () => {
-        this.addSectionError.set('Could not add section — save your basic info first.');
+      error: (err) => {
+        // 404 = no profile row yet (basic info never saved); other codes
+        // are genuine failures, so surface the backend message instead of
+        // always blaming unsaved basic info.
+        this.addSectionError.set(
+          err?.status === 404
+            ? 'Could not add section — save your basic info first.'
+            : (err?.error?.error ?? 'Could not add section. Please try again.'),
+        );
       },
     });
   }
@@ -190,6 +229,12 @@ export class ProfileSetupComponent implements OnInit {
   cancelAddSectionForm(): void {
     this.showAddSectionForm.set(false);
     this.addSectionError.set(null);
+  }
+
+  // Logged-out user tried to interact — show the prompt briefly.
+  promptLogin(): void {
+    this.loginPromptVisible.set(true);
+    setTimeout(() => this.loginPromptVisible.set(false), 3500);
   }
 
   scrollToSection(sectionId: string): void {
