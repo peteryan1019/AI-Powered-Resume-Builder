@@ -46,7 +46,7 @@ function ownsJob(req: Request, rawJobId?: string | string[]): ResumeJob | null {
 // POST /api/users/:userId/resumes
 // Kicks off a (placeholder) generation job and returns its id. The client then
 // opens the SSE stream below to watch it progress.
-router.post('/:userId/resumes', (req: Request, res: Response) => {
+router.post('/:userId/resumes-jobs', (req: Request, res: Response) => {
   const userId = (req.user as any)?.id;
 
   if (!userId || userId !== req.params.userId) {
@@ -67,7 +67,7 @@ router.post('/:userId/resumes', (req: Request, res: Response) => {
 
 // GET /api/users/:userId/resumes/:jobId/events
 // Server-Sent Events stream that walks the job through the FSM.
-router.get('/:userId/resumes/:jobId/events', (req: Request, res: Response) => {
+router.get('/:userId/resumes-jobs/:jobId/events', (req: Request, res: Response) => {
   const job = ownsJob(req, req.params.jobId);
 
   if (!job) {
@@ -116,7 +116,7 @@ router.get('/:userId/resumes/:jobId/events', (req: Request, res: Response) => {
 
       // Finished the final `done` state — hand the client the PDF location.
       send('complete', {
-        pdfUrl: `/api/users/${job.userId}/resumes/${job.id}/pdf`,
+        pdfUrl: `/api/users/${job.userId}/resumes-jobs/${job.id}/pdf`,
       });
       res.end();
     }, step.durationMs);
@@ -127,7 +127,7 @@ router.get('/:userId/resumes/:jobId/events', (req: Request, res: Response) => {
 
 // GET /api/users/:userId/resumes/:jobId/pdf
 // Serves the generated resume. Placeholder file for now.
-router.get('/:userId/resumes/:jobId/pdf', (req: Request, res: Response) => {
+router.get('/:userId/resumes-jobs/:jobId/pdf', (req: Request, res: Response) => {
   const job = ownsJob(req, req.params.jobId);
 
   if (!job) {

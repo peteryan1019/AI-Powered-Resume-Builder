@@ -1,0 +1,62 @@
+{
+  "header": {
+    "name": {
+      "id": "header-name",
+      "text": ""
+    },
+    "contact": {
+      "id": "header-contact-line",
+      "parts": [
+        {
+          "id": "contact-phone",
+          "text": ""
+        },
+        {
+          "id": "contact-email",
+          "text": "",
+          "href": ""
+        },
+        {
+          "id": "contact-linkedin",
+          "text": "LinkedIn",
+          "href": ""
+        },
+        {
+          "id": "contact-github",
+          "text": "GitHub",
+          "href": ""
+        }
+      ]
+    }
+  },
+  "sections": [
+    {
+      "id": "section-technical-skills",
+      "title": "TECHNICAL SKILLS",
+      "type": "bullets",
+      "bullets": []
+    },
+    {
+      "id": "section-projects",
+      "title": "PROJECTS",
+      "type": "entries",
+      "entries": []
+    },
+    {
+      "id": "section-professional-experiences",
+      "title": "PROFESSIONAL EXPERIENCE",
+      "type": "org_entries",
+      "entries": []
+    },
+    {
+      "id": "section-education",
+      "title": "EDUCATION",
+      "type": "education",
+      "school": {
+        "id": "education-school",
+        "text": ""
+      },
+      "bullets": []
+    }
+  ]
+}

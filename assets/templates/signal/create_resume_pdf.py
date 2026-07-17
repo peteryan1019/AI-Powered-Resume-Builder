@@ -11,6 +11,8 @@ from __future__ import annotations
 import os
 from typing import Dict, List, Optional, Tuple
 import argparse
+import json
+import sys
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.pdfmetrics import getAscentDescent, registerFontFamily, stringWidth
@@ -78,7 +80,14 @@ BULLET_GLYPH = "•"
 # Fonts: Carlito (metric-compatible Calibri). Falls back to Helvetica if the
 # bundled fonts are unavailable so the script never hard-fails.
 # -----------------------------------------------------------------------------
-_FONT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+_FONT_DIR = os.path.abspath(
+    os.path.join(
+        os.path.dirname(__file__),
+        "..",
+        "..",
+        "fonts",
+    )
+)
 
 
 def _register_fonts() -> Tuple[str, str, str, str]:
@@ -108,7 +117,7 @@ FONT, FONT_BOLD, FONT_ITALIC, FONT_BOLDIT = _register_fonts()
 # Use these IDs as the contract between your AI/API layer and the PDF generator.
 # apply_text_updates() rewrites any {"id": ..., "text": ...} (or "label") node.
 # -----------------------------------------------------------------------------
-RESUME_DATA = {'jobPostTitle': 'Backend Engineer',
+RESUME_DATA2 = {'jobPostTitle': 'Backend Engineer',
  'header': {'name': {'id': 'header-name', 'text': 'Dana Okafor'},
             'contact': {'id': 'header-contact-line',
                         'parts': [{'id': 'contact-phone', 'text': '647-555-0142'},
@@ -553,7 +562,7 @@ def _body_descent(font_scale: float) -> float:
     return -getAscentDescent(FONT, BODY_SIZE * font_scale)[1]
 
 
-def create_resume_pdf(output_path: str, updates_by_id: Optional[Dict[str, str]] = None) -> Dict[str, object]:
+def create_resume_pdf(output_path: str, RESUME_DATA: Optional[dict] = None, updates_by_id: Optional[Dict[str, str]] = None) -> Dict[str, object]:
     """Render the resume, auto-fitting and vertically balancing to the page.
 
     1. Pick the largest font scale whose content fits the page at natural spacing.
@@ -561,7 +570,7 @@ def create_resume_pdf(output_path: str, updates_by_id: Optional[Dict[str, str]] 
     3. Center the content block so the leftover blank is split equally top/bottom.
     """
     import copy
-    data = copy.deepcopy(RESUME_DATA)
+    data = copy.deepcopy(RESUME_DATA2 if RESUME_DATA is None else RESUME_DATA )
     if updates_by_id:
         data = apply_text_updates(data, updates_by_id)
 
@@ -626,6 +635,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    RESUME_DATA = json.load(sys.stdin)
+
     output_path = args.output_filename
 
     if not output_path.lower().endswith(".pdf"):
@@ -637,4 +648,4 @@ if __name__ == "__main__":
             output_path
         )
 
-    print(create_resume_pdf(output_path))
+    print(create_resume_pdf(output_path,RESUME_DATA=RESUME_DATA))

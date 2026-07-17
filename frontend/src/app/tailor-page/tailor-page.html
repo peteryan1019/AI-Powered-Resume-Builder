@@ -1,66 +1,79 @@
 <section class="tailor-page">
-	<div class="tailor-shell">
-		<article class="tailor-card job-card">
-			<p class="eyebrow">Tailor</p>
-			<h1>Shape one resume around one job post.</h1>
-			<p class="intro-copy">
-				Drop in a posting URL, keep the template you want, and build from the version that is already closest to the role.
-			</p>
+  <div class="tailor-shell">
+    <article class="tailor-card job-card">
+      <p class="eyebrow">Tailor</p>
+      <h1>Shape one resume around one job post.</h1>
+      <p class="intro-copy">
+        Drop in a posting URL, keep the template you want, and build from the version that is
+        already closest to the role.
+      </p>
 
-			<label class="field">
-				<span>Job post URL</span>
-				<input
-					type="url"
-					[(ngModel)]="jobPostUrl"
-					placeholder="https://jobs.example.com/software-engineer"
-				/>
-			</label>
+      <label class="field">
+        <span>Job post URL</span>
+        <input
+          type="url"
+          [(ngModel)]="jobPostUrl"
+          placeholder="https://jobs.example.com/software-engineer"
+        />
+      </label>
 
-			<div class="action-row">
-				<button type="button" class="primary-action" [disabled]="building" (click)="buildResume()">
-					{{ building ? 'Building…' : 'Build Resume' }}
-				</button>
-				<button type="button" class="secondary-action" (click)="startCheckout('view_templates', '/resume-templates')">
-					Browse templates
-				</button>
-			</div>
+      <div class="action-row">
+        <button type="button" class="primary-action" [disabled]="building" (click)="buildResume()">
+          {{ building ? 'Building…' : 'Build Resume' }}
+        </button>
+        <button
+          type="button"
+          class="secondary-action"
+          (click)="startCheckout('view_templates', '/resume-templates')"
+        >
+          Browse templates
+        </button>
+      </div>
 
-			<p class="status" *ngIf="buildMessage">{{ buildMessage }}</p>
-		</article>
+      <p class="status" *ngIf="buildMessage">{{ buildMessage }}</p>
 
-		<aside class="tailor-card template-card">
-			<div class="template-summary">
-				<div>
-					<p class="eyebrow">Selected template</p>
-					<h2>{{ selectedTemplate().title }}</h2>
-					<p class="template-description">{{ selectedTemplate().description }}</p>
-					<p class="template-highlight">{{ selectedTemplate().highlight }}</p>
-				</div>
+      <div class="generated-resume" *ngIf="createdResume">
+        <p>Your generated resume is ready.</p>
 
-				<button type="button" class="secondary-action view-action" (click)="openSelectedTemplate()">
-					View selected template
-				</button>
-			</div>
+        <button type="button" class="primary-action" (click)="openCreatedResume()">
+          View generated PDF
+        </button>
+      </div>
+    </article>
 
-			<div class="template-switcher">
-				<button
-					type="button"
-					class="template-chip"
-					*ngFor="let template of templates"
-					[class.active]="template.id === selectedTemplate().id"
-					(click)="selectTemplate(template.id)"
-				>
-					<span>{{ template.title }}</span>
-					<small>{{ template.highlight }}</small>
-				</button>
-			</div>
+    <aside class="tailor-card template-card">
+      <div class="template-summary">
+        <div>
+          <p class="eyebrow">Selected template</p>
+          <h2>{{ selectedTemplate().title }}</h2>
+          <p class="template-description">{{ selectedTemplate().description }}</p>
+          <p class="template-highlight">{{ selectedTemplate().highlight }}</p>
+        </div>
 
-			<div class="template-footer">
-				<button type="button" (click)="startCheckout('view_templates', '/resume-templates')">
-					Choose a different template
-				</button>
-				<span>Selection syncs across the app.</span>
-			</div>
-		</aside>
-	</div>
+        <button type="button" class="secondary-action view-action" (click)="openSelectedTemplate()">
+          View selected template
+        </button>
+      </div>
+
+      <div class="template-switcher">
+        <button
+          type="button"
+          class="template-chip"
+          *ngFor="let template of templates"
+          [class.active]="template.id === selectedTemplate().id"
+          (click)="selectTemplate(template.id)"
+        >
+          <span>{{ template.title }}</span>
+          <small>{{ template.highlight }}</small>
+        </button>
+      </div>
+
+      <div class="template-footer">
+        <button type="button" (click)="startCheckout('view_templates', '/resume-templates')">
+          Choose a different template
+        </button>
+        <span>Selection syncs across the app.</span>
+      </div>
+    </aside>
+  </div>
 </section>

@@ -7,6 +7,7 @@ import pg from 'pg';
 import cors from 'cors';
 import userRouter from './routes/user_routes.ts';
 import resumeRouter from './routes/resume_routes.ts';
+import resumeAIRouter1 from './routes/resumeAI1.js';
 import authSession from "./auth/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { LocalAuthError, loginLocalUser, signupLocalUser } from './lib/localAuth.js';
@@ -57,6 +58,7 @@ app.use(authSession.session());
 // Mount the user routes
 app.use('/api/users', requireAuth, userRouter);
 app.use('/api/users', requireAuth, resumeRouter);
+app.use('/api/users', requireAuth, resumeAIRouter1);
 
 app.get(
   "/auth/google",
