@@ -27,7 +27,6 @@ export interface CreateResumeResponse {
 export class ResumeService {
   private readonly http = inject(HttpClient);
 
-  // Use the same backend URL pattern used by your existing frontend services.
   private readonly apiUrl = "http://localhost:3000/api";
 
   createResume(

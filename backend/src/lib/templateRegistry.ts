@@ -10,10 +10,7 @@ const currentDirectory = path.dirname(currentFile);
 //
 // ../../../assets:
 // project-resumebuilder/assets
-const jsonpath = path.resolve(
-  currentDirectory,
-  "../../../assets",
-);
+const jsonpath = path.resolve(currentDirectory, "../../../assets",);
 
 const TEMPLATE_FILES: Record<string, string> = {
 /*
@@ -33,22 +30,14 @@ const TEMPLATE_FILES: Record<string, string> = {
   ),
 };
 
-export async function loadResumeTemplate(
-  templateId: string,
-): Promise<Record<string, unknown>> {
+export async function loadResumeTemplate(templateId: string,): Promise<Record<string, unknown>> {
   const templatePath = TEMPLATE_FILES[templateId];
 
   if (!templatePath) {
     throw new Error(`Unknown resume template: ${templateId}`);
   }
 
-  const templateContents = await readFile(
-    templatePath,
-    "utf8",
-  );
+  const templateContents = await readFile(templatePath, "utf8",);
 
-  return JSON.parse(templateContents) as Record<
-    string,
-    unknown
-  >;
+  return JSON.parse(templateContents) as Record<string, unknown>;
 }

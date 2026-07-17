@@ -8,21 +8,18 @@ import { GoogleGenAI } from "@google/genai";
 const GEMINI_API_KEY = process.env.APIKEY_2;
 
 if (!GEMINI_API_KEY) {
-  throw new Error("dnwkdnk");
+  throw new Error("Request failed");
 }
 
 export interface TailorResumeInput {
   userProfile: ExportedProfile;
-  jobPostingUrl: string;
+  URL: string;
   templateId: string;
 }
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-export async function finalResume(
-  input: Prisma.InputJsonObject,
-  input2: TailorResumeInput,
-): Promise<Prisma.InputJsonObject> {
+export async function finalResume(input: Prisma.InputJsonObject, input2: TailorResumeInput): Promise<Prisma.InputJsonObject> {
   const [selectedTemplate, resumeSchema] = await Promise.all([
     loadResumeTemplate(input2.templateId),
     loadResumeSchema(),
@@ -36,7 +33,7 @@ export async function finalResume(
     Given ${input} and the following;
 
     JOB POSTING URL:
-    ${input2.jobPostingUrl}
+    ${input2.URL}
 
     VERIFIED USER PROFILE:
     ${JSON.stringify(input2.userProfile, null, 2)}
@@ -50,11 +47,7 @@ export async function finalResume(
 
     tools: [{ type: "url_context" }],
 
-    response_format: {
-      type: "text",
-      mime_type: "application/json",
-      schema: resumeSchema,
-    },
+    response_format: {type: "text", mime_type: "application/json", schema: resumeSchema,},
   });
 
   const outputText = interaction.output_text;
@@ -63,25 +56,16 @@ export async function finalResume(
     throw new Error("Gemini returned an empty response.");
   }
 
-  console.log("Second request complete");
-
   try {
     const parsed: unknown = JSON.parse(outputText);
 
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
       throw new Error("Gemini returned JSON that was not an object.");
     }
 
     return parsed as Prisma.InputJsonObject;
   } catch (error: unknown) {
-    if (
-      error instanceof Error &&
-      error.message === "Gemini returned JSON that was not an object."
-    ) {
+    if (error instanceof Error && error.message === "Gemini returned JSON that was not an object.") {
       throw error;
     }
 

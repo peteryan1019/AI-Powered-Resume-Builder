@@ -18,56 +18,31 @@ const router = Router();
 router.post("/:userId/resumes", async (req: Request, res: Response) => {
     try {
         const { userId } = req.params;
-        const { jobPostingUrl, templateId } = req.body;
+        const { URL, templateId } = req.body;
 
         if (!req.user) {
-            return res.status(401).json({
-            error: "You must be logged in.",
-            });
+            return res.status(401).json({error: "Please log in.",});
         }
 
         const currentUser = req.user as User;
         // Prevent an authenticated user from accessing another user's profile.
         if (currentUser.id !== userId) {
-            return res.status(403).json({
-            error: "You cannot create a resume for this user.",
-            });
+            return res.status(403).json({error: "You cannot create a resume for this user.",});
         }
 
-        if (
-            typeof jobPostingUrl !== "string" ||
-            !jobPostingUrl.trim()
-        ) {
-            return res.status(400).json({
-            error: "jobPostingUrl is required.",
-            });
+        if (typeof URL !== "string" || !URL.trim()) {
+            return res.status(400).json({error: "Please enter a valid URL.",});
         }
 
-        if (
-            typeof templateId !== "string" ||
-            !templateId.trim()
-        ) {
-            return res.status(400).json({
-            error: "templateId is required.",
-            });
+        if(typeof templateId !== "string" || !templateId.trim()) {
+            return res.status(400).json({error: "Please select a valid template",});
         }
 
         const exportedProfile = await getExportedProfile(currentUser);
 
-        const tailoredResume = await tailorResume({
-            userProfile: exportedProfile,
-            jobPostingUrl: jobPostingUrl.trim(),
-            templateId: templateId.trim(),
-        });
+        const tailoredResume = await tailorResume({userProfile: exportedProfile, URL: URL.trim(), templateId: templateId.trim(),});
 
-        const completeResume = await finalResume(tailoredResume, {
-            userProfile: exportedProfile,
-            jobPostingUrl: jobPostingUrl.trim(),
-            templateId: templateId.trim(),
-        }
-        );
-
-        console.log("JSON done");
+        const completeResume = await finalResume(tailoredResume, {userProfile: exportedProfile, URL: URL.trim(), templateId: templateId.trim(),});
 
         let gPath: string;
 
@@ -80,43 +55,21 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
         } else if(t=="atelier") {
             gPath = path.resolve("../assets/templates/atelier/create_resume_pdf.py");
         }  else {
-            return res.status(400).json({
-                error: `Unsupported template: ${t}`,
-            });
+            return res.status(400).json({error: `Unsupported template: ${t}`,});
         }
 
-        console.log("Generator path:", gPath);
+        const oPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`,);
 
-        const oPath = path.join(
-        os.tmpdir(),
-        `${randomUUID()}.pdf`,
-        );
-
-        console.log("Starting Python generator");
-
-        const pythonProcess = spawn("python3", [
-        gPath,
-        oPath,
-        ]);
-
-        let pythonError = "";
-
-        pythonProcess.stderr.on("data", (data) => {
-        pythonError += data.toString();
-        });
+        const pythonProcess = spawn("python3", [gPath, oPath,]);
 
         pythonProcess.stdin.end(JSON.stringify(completeResume));
 
         const [exitCode] = await once(pythonProcess, "close");
 
-        console.log("Python exit code:", exitCode);
-
         if (exitCode !== 0) {
-        console.error("Python error:\n", pythonError);
         throw new Error("PDF generation failed.");
         }
 
-        console.log("Python generation complete");
 
         const pdfData = await readFile(oPath);
         await unlink(oPath);
@@ -125,11 +78,12 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
         data: {
             userId: currentUser.id,
             templateId: t,
-            jobPostingUrl: jobPostingUrl.trim(),
+            URL: URL.trim(),
             content: completeResume,
             pdfData,
         },
         });
+
         const {
         pdfData: _storedPdf,
         ...resumeWithoutPdf
@@ -140,16 +94,7 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
         });
 
     } catch (error: unknown) {
-      console.error("Failed to tailor resume:", error);
-
-      const message =
-        error instanceof Error
-          ? error.message
-          : "Failed to tailor resume.";
-
-      return res.status(500).json({
-        error: message,
-      });
+      return res.status(500).json({});
     }
   },
 );
@@ -177,15 +122,11 @@ router.get(
     });
 
     if (!resume?.pdfData) {
-      return res.status(404).json({
-        error: "PDF not found.",
-      });
+      return res.status(404).json({error: "PDF not found.",});
     }
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader(
-      "Content-Disposition",
-      'inline; filename="resume.pdf"',
+    res.setHeader("Content-Disposition", 'inline; filename="resume.pdf"',
     );
 
     return res.send(Buffer.from(resume.pdfData));
