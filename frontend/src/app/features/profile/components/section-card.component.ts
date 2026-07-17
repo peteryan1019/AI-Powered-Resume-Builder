@@ -17,7 +17,7 @@ import { InstanceFormComponent } from './instance-form.component';
       <div class="section-header" (click)="expanded = !expanded">
         <div class="section-title">
           <span class="section-dot"></span>
-          <span class="section-name">{{ section.label }}</span>
+          <span class="section-name">{{ config.label }}</span>
           <span class="section-meta" *ngIf="section.instances.length > 0">
             {{ section.instances.length }} {{ section.instances.length === 1 ? 'entry' : 'entries' }}
           </span>
@@ -117,7 +117,7 @@ export class SectionCardComponent {
   }
 
   onDeleteSection(): void {
-    if (confirm(`Delete "${this.section.label}" and all its entries?`)) {
+    if (confirm(`Delete "${this.config.label}" and all its entries?`)) {
       this.sectionDeleted.emit();
     }
   }

@@ -172,7 +172,7 @@ app.post("/auth/logout", (req, res, next) => {
   });
 });
 
-app.use('/api/profile', profileRouter);
+app.use('/api/profile', requireAuth, profileRouter);
 
 app.use('/api/payments', requireAuth, paymentRouter);
 

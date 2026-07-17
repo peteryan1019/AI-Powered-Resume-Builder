@@ -3,7 +3,7 @@
 import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup } from '@angular/forms';
-import { Profile } from '../profile.types';
+import { Profile, ProfileUser } from '../profile.types';
 
 @Component({
   selector: 'app-basic-info-form',
@@ -26,16 +26,16 @@ import { Profile } from '../profile.types';
 
           <div class="basic-info-grid">
             <div class="field-group">
-              <label>Full name</label>
-              <input formControlName="name" placeholder="Kate Marchetti" />
+              <label>Full name <span class="field-lock">from account</span></label>
+              <input [value]="user?.name ?? ''" readonly />
             </div>
             <div class="field-group">
               <label>Headline</label>
               <input formControlName="headline" placeholder="Full-stack developer" />
             </div>
             <div class="field-group">
-              <label>Email</label>
-              <input formControlName="email" type="email" placeholder="kate@email.com" />
+              <label>Email <span class="field-lock">from account</span></label>
+              <input [value]="user?.email ?? ''" type="email" readonly />
             </div>
             <div class="field-group">
               <label>Phone</label>
@@ -87,6 +87,7 @@ import { Profile } from '../profile.types';
 })
 export class BasicInfoFormComponent implements OnInit, OnChanges {
   @Input() profile: Profile | null = null;
+  @Input() user: ProfileUser | null = null;
   @Input() saveStatus: 'idle' | 'saved' | 'error' = 'idle';
   @Output() saved = new EventEmitter<Partial<Profile>>();
 
@@ -96,10 +97,10 @@ export class BasicInfoFormComponent implements OnInit, OnChanges {
   constructor(private fb: FormBuilder) {}
 
   ngOnInit(): void {
+    // name/email are NOT in the form — they live on User and are shown
+    // read-only above. The form only holds editable Profile fields.
     this.form = this.fb.group({
-      name:      [''],  // NOTE: name is on User, not Profile — read-only from auth
       headline:  [this.profile?.headline ?? ''],
-      email:     [''],  // NOTE: email is on User, not Profile — read-only from auth
       phone:     [this.profile?.phone ?? ''],
       location:  [this.profile?.location ?? ''],
       summary:   [this.profile?.summary ?? ''],

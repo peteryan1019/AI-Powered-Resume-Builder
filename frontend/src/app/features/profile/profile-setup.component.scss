@@ -1,4 +1,14 @@
+// Shared "glass card" surface used by the sidebar and page header.
+%glass-card {
+  border-radius: 24px;
+  background: rgba(13, 16, 39, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 50px rgba(3, 5, 15, 0.18);
+}
+
 .profile-layout {
+  position: relative;
   display: flex;
   gap: 1.25rem;
   max-width: 1240px;
@@ -8,6 +18,7 @@
 }
 
 .profile-sidebar {
+  @extend %glass-card;
   width: 280px;
   flex-shrink: 0;
   display: flex;
@@ -16,11 +27,6 @@
   position: sticky;
   top: 1rem;
   padding: 1rem;
-  border-radius: 24px;
-  background: rgba(13, 16, 39, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 18px 50px rgba(3, 5, 15, 0.18);
 }
 
 .sidebar-label {
@@ -84,13 +90,66 @@
   gap: 1rem;
 }
 
-.page-header {
-  padding: 1.15rem 1.35rem;
+.section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section-drag-item {
+  display: flex;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.section-drag-card {
+  flex: 1;
+  min-width: 0;
+}
+
+.drag-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(244, 246, 255, 0.4);
+  cursor: grab;
+  transition: background-color 160ms ease, color 160ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(244, 246, 255, 0.75);
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+// While dragging: the floating copy follows the cursor.
+.cdk-drag-preview {
+  box-shadow: 0 24px 60px rgba(3, 5, 15, 0.4);
   border-radius: 24px;
-  background: rgba(13, 16, 39, 0.72);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  backdrop-filter: blur(18px);
-  box-shadow: 0 18px 50px rgba(3, 5, 15, 0.18);
+}
+
+// The gap left behind at the drop target.
+.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+
+// Smoothly animate the other items sliding out of the way.
+.cdk-drag-animating,
+.section-list.cdk-drop-list-dragging .section-drag-item:not(.cdk-drag-placeholder) {
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.page-header {
+  @extend %glass-card;
+  padding: 1.15rem 1.35rem;
 }
 
 .page-header h1 {
@@ -117,6 +176,36 @@
   i {
     font-size: 2rem;
     color: rgba(244, 246, 255, 0.45);
+  }
+}
+
+// Transparent layer over the whole page before login — blocks all input
+// (so fields can't be filled) and prompts to log in when clicked.
+.auth-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: not-allowed;
+}
+
+.login-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 2rem;
+  transform: translateX(-50%);
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.75rem 1.1rem;
+  border-radius: 999px;
+  color: #f4f6ff;
+  font-size: 0.9rem;
+  @extend %glass-card;
+
+  a {
+    color: #cfd8ff;
+    font-weight: 600;
   }
 }
 

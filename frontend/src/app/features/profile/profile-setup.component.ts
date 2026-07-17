@@ -3,11 +3,13 @@
 import { Component, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { ProfileService } from './profile.service';
+import { AuthService } from '../auth/auth.service';
 import { Profile, SectionType, SECTION_CONFIG } from './profile.types';
 import { BasicInfoFormComponent } from './components/basic-info-form.component';
 import { SectionCardComponent } from './components/section-card.component';
-import { ResumeUploadBannerComponent } from './components/resume-upload-banner.component';
 
 
 @Component({
@@ -16,25 +18,16 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
   imports: [
     CommonModule,
     FormsModule,
+    RouterLink,
+    DragDropModule,
     BasicInfoFormComponent,
     SectionCardComponent,
-    ResumeUploadBannerComponent,
   ],
   template: `
     <div class="profile-layout">
 
       <!-- Sidebar -->
       <nav class="profile-sidebar">
-        <p class="sidebar-label">Profile</p>
-        <button class="nav-item" [class.active]="activeSection === 'basic'" (click)="activeSection = 'basic'">
-          <i class="ti ti-user-circle"></i> Basic info
-        </button>
-        <button class="nav-item" [class.active]="activeSection === 'links'" (click)="activeSection = 'links'">
-          <i class="ti ti-link"></i> Links
-        </button>
-
-        <hr class="nav-divider" />
-
         <p class="sidebar-label">Sections</p>
         <button
           *ngFor="let section of profile()?.sections"
@@ -43,7 +36,7 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
         >
           <span>
             <i class="ti {{ sectionConfig[section.type].icon }}"></i>
-            {{ section.label }}
+            {{ sectionConfig[section.type].label }}
           </span>
           <span class="count">{{ section.instances.length }}</span>
         </button>
@@ -57,18 +50,14 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
         <div class="add-section-form" *ngIf="showAddSectionForm()">
           <label>
             Section type
-            <select [(ngModel)]="newSectionType" (ngModelChange)="onNewSectionTypeChange($event)">
+            <select [(ngModel)]="newSectionType">
               <option *ngFor="let type of sectionTypes" [value]="type">{{ sectionConfig[type].label }}</option>
             </select>
-          </label>
-          <label>
-            Label
-            <input [(ngModel)]="newSectionLabel" placeholder="e.g. Work experience" />
           </label>
           <p class="add-section-error" *ngIf="addSectionError()">{{ addSectionError() }}</p>
           <div class="add-section-form-actions">
             <button class="btn-secondary" (click)="cancelAddSectionForm()">Cancel</button>
-            <button class="btn-primary" [disabled]="!newSectionLabel.trim()" (click)="confirmAddSection()">Add</button>
+            <button class="btn-primary" (click)="confirmAddSection()">Add</button>
           </div>
         </div>
       </nav>
@@ -80,31 +69,36 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
           <p>This is the source of truth for all your resumes. Keep it complete for best AI results.</p>
         </div>
 
-        <!-- Resume upload -->
-        <app-resume-upload-banner
-          [resumeFileName]="profile()?.resumeFileName ?? null"
-          [isParsing]="isParsing()"
-          (fileSelected)="onResumeUpload($event)"
-        />
-
         <!-- Basic info form -->
         <app-basic-info-form
           *ngIf="profile() !== undefined"
           [profile]="profile()"
+          [user]="user()"
           [saveStatus]="basicInfoSaveStatus()"
           (saved)="onBasicInfoSaved($event)"
         />
 
-        <!-- Section cards -->
-        <app-section-card
-          *ngFor="let section of profile()?.sections"
-          [id]="'section-' + section.id"
-          [section]="section"
-          (instanceAdded)="onInstanceAdded(section.id, $event)"
-          (instanceUpdated)="onInstanceUpdated(section.id, $event.id, $event.data)"
-          (instanceDeleted)="onInstanceDeleted(section.id, $event)"
-          (sectionDeleted)="onSectionDeleted(section.id)"
-        />
+        <!-- Section cards (drag to reorder) -->
+        <div class="section-list" cdkDropList (cdkDropListDropped)="onSectionDrop($event)">
+          <div
+            class="section-drag-item"
+            *ngFor="let section of profile()?.sections"
+            cdkDrag
+            [id]="'section-' + section.id"
+          >
+            <button class="drag-handle" cdkDragHandle type="button" title="Drag to reorder">
+              <i class="ti ti-grip-vertical"></i>
+            </button>
+            <app-section-card
+              class="section-drag-card"
+              [section]="section"
+              (instanceAdded)="onInstanceAdded(section.id, $event)"
+              (instanceUpdated)="onInstanceUpdated(section.id, $event.id, $event.data)"
+              (instanceDeleted)="onInstanceDeleted(section.id, $event)"
+              (sectionDeleted)="onSectionDeleted(section.id)"
+            />
+          </div>
+        </div>
 
         <!-- Empty state -->
         <div *ngIf="profile()?.sections?.length === 0" class="empty-sections">
@@ -116,6 +110,21 @@ import { ResumeUploadBannerComponent } from './components/resume-upload-banner.c
         </div>
       </div>
 
+      <!-- Before login: cover the page so nothing can be filled in;
+           clicking anywhere prompts the user to log in first. -->
+      <div
+        class="auth-overlay"
+        *ngIf="sessionChecked() && !auth.isAuthenticated()"
+        (click)="promptLogin()"
+      ></div>
+
+    </div>
+
+    <!-- Transient prompt shown when a logged-out user tries to interact. -->
+    <div class="login-toast" *ngIf="loginPromptVisible()">
+      <i class="ti ti-lock"></i>
+      <span>Please log in before filling in your profile.</span>
+      <a routerLink="/login">Log in</a>
     </div>
   `,
   styleUrls: ['./profile-setup.component.scss'],
@@ -124,33 +133,35 @@ export class ProfileSetupComponent implements OnInit {
   // A signal (not a plain property) so updates arriving from async HTTP
   // callbacks are picked up by zoneless change detection.
   profile!: ProfileService['profile'];
-  isParsing = signal(false);
+  user!: ProfileService['user'];
   showAddSectionForm = signal(false);
   addSectionError = signal<string | null>(null);
   basicInfoSaveStatus = signal<'idle' | 'saved' | 'error'>('idle');
+  // False until the session check resolves, so we don't flash the login
+  // overlay before we know whether the user is actually logged in.
+  sessionChecked = signal(false);
+  loginPromptVisible = signal(false);
 
-  activeSection = 'basic';
   sectionConfig = SECTION_CONFIG;
   sectionTypes = Object.keys(SECTION_CONFIG) as SectionType[];
   newSectionType: SectionType = this.sectionTypes[0];
-  newSectionLabel = SECTION_CONFIG[this.sectionTypes[0]].label;
 
-  constructor(private profileService: ProfileService) {
+  constructor(
+    private profileService: ProfileService,
+    readonly auth: AuthService,
+  ) {
     this.profile = this.profileService.profile;
+    this.user = this.profileService.user;
   }
 
   ngOnInit(): void {
-    this.profileService.loadProfile().subscribe();
-  }
-
-  onResumeUpload(file: File): void {
-    this.isParsing.set(true);
-    this.profileService.uploadResume(file).subscribe({
-      next: () => {
-        // isParsing stays true until WebSocket signals parsing done
-        // (Prithvi's WebSocket handler calls loadProfile() when AI is done)
-      },
-      error: () => this.isParsing.set(false),
+    // Confirm auth first; only load the profile once we know we're logged in
+    // (avoids a guaranteed 401 and lets the template gate on auth state).
+    this.auth.loadSession().subscribe((user) => {
+      this.sessionChecked.set(true);
+      if (user) {
+        this.profileService.loadProfile().subscribe();
+      }
     });
   }
 
@@ -182,27 +193,36 @@ export class ProfileSetupComponent implements OnInit {
     this.profileService.deleteSection(sectionId).subscribe();
   }
 
+  onSectionDrop(event: CdkDragDrop<unknown>): void {
+    // Service updates local order optimistically; reload to roll back on failure.
+    this.profileService.moveSection(event.previousIndex, event.currentIndex).subscribe({
+      error: () => this.profileService.loadProfile().subscribe(),
+    });
+  }
+
   openAddSectionModal(): void {
     this.newSectionType = this.sectionTypes[0];
-    this.newSectionLabel = SECTION_CONFIG[this.newSectionType].label;
     this.addSectionError.set(null);
     this.showAddSectionForm.set(true);
   }
 
-  onNewSectionTypeChange(type: SectionType): void {
-    this.newSectionLabel = SECTION_CONFIG[type].label;
-  }
-
   confirmAddSection(): void {
-    const label = this.newSectionLabel.trim();
-    if (!label) return;
     this.addSectionError.set(null);
+    // Label is no longer user-editable; it always mirrors the type name.
+    const label = SECTION_CONFIG[this.newSectionType].label;
     this.profileService.addSection(this.newSectionType, label).subscribe({
       next: () => {
         this.showAddSectionForm.set(false);
       },
-      error: () => {
-        this.addSectionError.set('Could not add section — save your basic info first.');
+      error: (err) => {
+        // 404 = no profile row yet (basic info never saved); other codes
+        // are genuine failures, so surface the backend message instead of
+        // always blaming unsaved basic info.
+        this.addSectionError.set(
+          err?.status === 404
+            ? 'Could not add section — save your basic info first.'
+            : (err?.error?.error ?? 'Could not add section. Please try again.'),
+        );
       },
     });
   }
@@ -210,6 +230,12 @@ export class ProfileSetupComponent implements OnInit {
   cancelAddSectionForm(): void {
     this.showAddSectionForm.set(false);
     this.addSectionError.set(null);
+  }
+
+  // Logged-out user tried to interact — show the prompt briefly.
+  promptLogin(): void {
+    this.loginPromptVisible.set(true);
+    setTimeout(() => this.loginPromptVisible.set(false), 3500);
   }
 
   scrollToSection(sectionId: string): void {

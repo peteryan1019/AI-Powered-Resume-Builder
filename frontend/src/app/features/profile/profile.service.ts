@@ -2,8 +2,8 @@
 
 import { Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, tap } from 'rxjs';
-import { Profile, ProfileSection, ProfileInstance, SectionType } from './profile.types';
+import { Observable, of, tap } from 'rxjs';
+import { Profile, ProfileSection, ProfileInstance, ProfileUser, SectionType } from './profile.types';
 
 const API = '/api/profile';
 
@@ -16,40 +16,38 @@ export class ProfileService {
   private profileSignal = signal<Profile | null>(null);
   readonly profile = this.profileSignal.asReadonly();
 
+  // name/email/avatar from the User table — read-only in this feature.
+  private userSignal = signal<ProfileUser | null>(null);
+  readonly user = this.userSignal.asReadonly();
+
   constructor(private http: HttpClient) {}
 
-  // ── Load ────────────────────────────────
-  loadProfile(): Observable<{ profile: Profile | null }> {
-    return this.http.get<{ profile: Profile | null }>(API).pipe(
-      tap(({ profile }) => this.profileSignal.set(profile))
+  //  Load
+  loadProfile(): Observable<{ profile: Profile | null; user: ProfileUser }> {
+    return this.http.get<{ profile: Profile | null; user: ProfileUser }>(API, { withCredentials: true }).pipe(
+      tap(({ profile, user }) => {
+        this.profileSignal.set(profile);
+        this.userSignal.set(user);
+      })
     );
   }
 
-  // ── Basic info + links ──────────────────
+  // Basic info + links
   saveBasicInfo(data: Partial<Profile>): Observable<{ profile: Profile }> {
-    return this.http.put<{ profile: Profile }>(API, data).pipe(
+    return this.http.put<{ profile: Profile }>(API, data, { withCredentials: true }).pipe(
       tap(({ profile }) => this.profileSignal.set(profile))
     );
   }
 
-  // ── Resume upload ───────────────────────
-  uploadResume(file: File): Observable<{ profile: Profile; message: string }> {
-    const form = new FormData();
-    form.append('resume', file);
-    return this.http.post<{ profile: Profile; message: string }>(`${API}/resume`, form);
-    // NOTE: after upload, AI parsing result arrives via WebSocket (Prithvi)
-    // and will call loadProfile() to refresh state when done.
-  }
-
-  // ── Sections ────────────────────────────
+  // Sections
   addSection(type: SectionType, label: string): Observable<{ section: ProfileSection }> {
-    return this.http.post<{ section: ProfileSection }>(`${API}/sections`, { type, label }).pipe(
+    return this.http.post<{ section: ProfileSection }>(`${API}/sections`, { type, label }, { withCredentials: true }).pipe(
       tap(({ section }) => {
         const profile = this.profileSignal();
         if (profile) {
           this.profileSignal.set({
             ...profile,
-            sections: [...profile.sections, { ...section, instances: [] }],
+            sections: [...(profile.sections ?? []), { ...section, instances: [] }],
           });
         }
       })
@@ -57,7 +55,7 @@ export class ProfileService {
   }
 
   deleteSection(sectionId: string): Observable<{ deleted: boolean }> {
-    return this.http.delete<{ deleted: boolean }>(`${API}/sections/${sectionId}`).pipe(
+    return this.http.delete<{ deleted: boolean }>(`${API}/sections/${sectionId}`, { withCredentials: true }).pipe(
       tap(() => {
         const profile = this.profileSignal();
         if (profile) {
@@ -71,13 +69,32 @@ export class ProfileService {
   }
 
   reorderSections(sections: { id: string; order: number }[]): Observable<{ reordered: boolean }> {
-    return this.http.put<{ reordered: boolean }>(`${API}/sections/reorder`, { sections });
+    return this.http.put<{ reordered: boolean }>(`${API}/sections/reorder`, { sections }, { withCredentials: true });
   }
 
-  // ── Instances ───────────────────────────
+  // Optimistically reorder sections in local state, then persist.
+  // The caller is responsible for rolling back (e.g. reloadProfile) on error.
+  moveSection(previousIndex: number, currentIndex: number): Observable<{ reordered: boolean }> {
+    const profile = this.profileSignal();
+    if (!profile || previousIndex === currentIndex) {
+      return of({ reordered: false });
+    }
+
+    const sections = [...profile.sections];
+    const [moved] = sections.splice(previousIndex, 1);
+    sections.splice(currentIndex, 0, moved);
+
+    // Renumber `order` to match the new positions (0-based).
+    const reordered = sections.map((s, i) => ({ ...s, order: i }));
+    this.profileSignal.set({ ...profile, sections: reordered });
+
+    return this.reorderSections(reordered.map(s => ({ id: s.id, order: s.order })));
+  }
+
+  // Instances
   addInstance(sectionId: string, data: Record<string, unknown>): Observable<{ instance: ProfileInstance }> {
     return this.http
-      .post<{ instance: ProfileInstance }>(`${API}/sections/${sectionId}/instances`, { data })
+      .post<{ instance: ProfileInstance }>(`${API}/sections/${sectionId}/instances`, { data }, { withCredentials: true })
       .pipe(
         tap(({ instance }) => {
           const profile = this.profileSignal();
@@ -101,7 +118,7 @@ export class ProfileService {
     data: Record<string, unknown>
   ): Observable<{ instance: ProfileInstance }> {
     return this.http
-      .put<{ instance: ProfileInstance }>(`${API}/sections/${sectionId}/instances/${instanceId}`, { data })
+      .put<{ instance: ProfileInstance }>(`${API}/sections/${sectionId}/instances/${instanceId}`, { data }, { withCredentials: true })
       .pipe(
         tap(({ instance }) => {
           const profile = this.profileSignal();
@@ -124,7 +141,7 @@ export class ProfileService {
 
   deleteInstance(sectionId: string, instanceId: string): Observable<{ deleted: boolean }> {
     return this.http
-      .delete<{ deleted: boolean }>(`${API}/sections/${sectionId}/instances/${instanceId}`)
+      .delete<{ deleted: boolean }>(`${API}/sections/${sectionId}/instances/${instanceId}`, { withCredentials: true })
       .pipe(
         tap(() => {
           const profile = this.profileSignal();
