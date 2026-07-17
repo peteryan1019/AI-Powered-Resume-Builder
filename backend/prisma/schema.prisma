@@ -37,7 +37,7 @@ model Resume {
   id            String   @id @default(uuid())
   userId        String
   templateId    String
-  jobPostingUrl String
+  URL           String @map("jobPostingUrl")
   content       Json?
   pdfData       Bytes?
   createdAt     DateTime @default(now())

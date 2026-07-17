@@ -3,7 +3,7 @@ import { HttpClient } from "@angular/common/http";
 import { Observable } from "rxjs";
 
 export interface CreateResumeRequest {
-  jobPostingUrl: string;
+  URL: string;
   templateId: string;
 }
 
@@ -11,7 +11,7 @@ export interface CreatedResume {
   id: string;
   userId: string;
   templateId: string;
-  jobPostingUrl: string;
+  URL: string;
   content: unknown;
   createdAt: string;
   updatedAt: string;

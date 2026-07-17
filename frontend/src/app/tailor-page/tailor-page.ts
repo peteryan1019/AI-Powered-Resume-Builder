@@ -110,7 +110,7 @@ export class TailorPage {
 
     this.resumeService
       .createResume(userId, {
-        jobPostingUrl: jobUrl,
+        URL: jobUrl,
         templateId: template.id,
       })
       .subscribe({
