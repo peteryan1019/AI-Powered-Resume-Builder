@@ -30,7 +30,7 @@ export async function finalResume(input: Prisma.InputJsonObject, input2: TailorR
 
     input: `
 
-    Given ${input} and the following;
+    Given ${JSON.stringify(input, null, 2)} and the following;
 
     JOB POSTING URL:
     ${input2.URL}
@@ -41,8 +41,14 @@ export async function finalResume(input: Prisma.InputJsonObject, input2: TailorR
     RETURN THE RESULT USING THIS STRUCTURE AND ONLY THIS STRUCTURE:
     ${JSON.stringify(selectedTemplate, null, 2)}
 
-    I want to modify/review ${input} so that everything is tailored to the job posting. If enough space add additional information from the userProfile to the structure.
+    I want to modify/review ${JSON.stringify(input, null, 2)} so that everything is tailored to the job posting. If enough space add additional information from the userProfile to the structure.
     Also bold any words you find important so but a /b before it ex. Python keep it as /bPython.
+
+    - Never invent or infer skills, technologies, projects, employers,
+      roles, education, dates, metrics, achievements, or responsibilities.
+    - Do not reinterpret an existing fact as a different kind of experience.
+    - Delete every claim in the draft that is not directly supported by
+      the verified user profile.
     `,
 
     tools: [{ type: "url_context" }],
