@@ -31,14 +31,6 @@
       </div>
 
       <p class="status" *ngIf="buildMessage">{{ buildMessage }}</p>
-
-      <div class="generated-resume" *ngIf="createdResume">
-        <p>Your generated resume is ready.</p>
-
-        <button type="button" class="primary-action" (click)="openCreatedResume()">
-          View generated PDF
-        </button>
-      </div>
     </article>
 
     <aside class="tailor-card template-card">

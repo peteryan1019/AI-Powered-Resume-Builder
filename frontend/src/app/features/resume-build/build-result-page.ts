@@ -115,7 +115,11 @@ import { ResumeBuildService } from './resume-build.service';
       .preview iframe {
         display: block;
         width: 100%;
-        height: 80vh;
+        /* Match one Letter page's proportions (8.5 x 11) so the iframe is as
+           tall as the rendered page instead of a fixed 80vh window that cuts
+           the resume off and forces a cramped nested scroll. */
+        aspect-ratio: 8.5 / 11;
+        height: auto;
         border: 0;
       }
       .fallback a {

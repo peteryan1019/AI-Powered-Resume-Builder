@@ -299,10 +299,13 @@ export class BuildStatusPage implements OnInit, OnDestroy {
       }
     });
 
-    this.source.addEventListener('complete', () => {
+    this.source.addEventListener('complete', (event) => {
+      const { resumeId } = JSON.parse((event as MessageEvent).data) as {
+        resumeId: string;
+      };
       this.completed.set(true);
       this.source?.close();
-      void this.router.navigate(['/tailor/result', jobId]);
+      void this.router.navigate(['/tailor/result', resumeId]);
     });
 
     this.source.addEventListener('error', () => {

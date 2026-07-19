@@ -1,13 +1,11 @@
 import { CommonModule } from '@angular/common';
-import { Component, computed, inject, ChangeDetectorRef } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AuthService } from '../features/auth/auth.service';
 import { PaymentService } from '../features/payments/payment.service';
 import { ResumeTemplateService } from '../features/template-selection/resume-template.service';
-import {
-  ResumeService,
-  type CreatedResume,
-} from '../services/resume.service';
+import { ResumeBuildService } from '../features/resume-build/resume-build.service';
 
 @Component({
   selector: 'app-tailor-page',
@@ -20,11 +18,10 @@ export class TailorPage {
   private readonly payment = inject(PaymentService);
   private readonly templateLibrary = inject(ResumeTemplateService);
   private readonly auth = inject(AuthService);
-  private readonly resumeService = inject(ResumeService);
-  private readonly changeDetector = inject(ChangeDetectorRef);
+  private readonly resumeBuild = inject(ResumeBuildService);
+  private readonly router = inject(Router);
 
   building = false;
-  createdResume: CreatedResume | null = null;
 
   readonly templates = this.templateLibrary.templates;
 
@@ -45,25 +42,6 @@ export class TailorPage {
   openSelectedTemplate(): void {
     window.open(
       this.selectedTemplate().pdfPath,
-      '_blank',
-      'noopener',
-    );
-  }
-
-  openCreatedResume(): void {
-    const userId = this.auth.user()?.id;
-
-    if (!this.createdResume || !userId) {
-      return;
-    }
-
-    const pdfUrl = this.resumeService.getPdfUrl(
-      userId,
-      this.createdResume.id,
-    );
-
-    window.open(
-      pdfUrl,
       '_blank',
       'noopener',
     );
@@ -103,27 +81,17 @@ export class TailorPage {
     const template = this.selectedTemplate();
 
     this.building = true;
-    this.createdResume = null;
 
     this.buildMessage =
       `Building ${template.title} for ${parsedUrl.hostname}...`;
 
-    this.resumeService
-      .createResume(userId, {
-        URL: jobUrl,
-        templateId: template.id,
-      })
+    // Register the build, then hand off to the live status page (the animated
+    // state machine) which streams progress over SSE and routes to the result.
+    this.resumeBuild
+      .startBuild(userId, jobUrl, template.id)
       .subscribe({
-        next: ({ resume }) => {
-          this.building = false;
-          this.createdResume = resume;
-
-          this.buildMessage =
-            `${template.title} was successfully created.`;
-
-          this.changeDetector.detectChanges();
-
-          console.log('Created resume:', resume);
+        next: ({ jobId }) => {
+          void this.router.navigate(['/tailor/build', jobId]);
         },
         error: (error) => {
           this.building = false;
@@ -132,10 +100,8 @@ export class TailorPage {
             error?.error?.error ??
             'Unable to build the resume right now.';
 
-          this.changeDetector.detectChanges();
-
           console.error('Resume build failed:', error);
         },
-        });
+      });
   }
 }
