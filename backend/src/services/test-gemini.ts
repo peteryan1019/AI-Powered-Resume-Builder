@@ -45,6 +45,8 @@ export async function tailorResume(input: TailorResumeInput): Promise<Prisma.Inp
     - Use only facts from the user profile.
     - Do not invent qualifications, experience, dates, skills, or metrics.
     - Keep the exact property names shown in the output structure.
+    - Set "jobPostTitle" to the exact job title from the job posting at the URL
+      (e.g. "Senior Backend Engineer"). If you cannot determine it, use "Untitled role".
     - Return JSON only.
     `,
 

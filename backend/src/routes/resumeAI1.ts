@@ -64,6 +64,14 @@ const STAGE_META: Record<BuildState, { label: string; step: number }> = {
 };
 const STAGE_TOTAL = 3;
 
+function hostnameOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
 function resolveGeneratorPath(templateId: string): string {
   switch (templateId) {
     case "signal":
@@ -119,9 +127,18 @@ async function runBuildPipeline(
   const pdfData = await readFile(oPath);
   await unlink(oPath);
 
+  // Title the resume after the job post. The AI emits `jobPostTitle` per the
+  // schema; fall back to the posting hostname if it's missing/blank.
+  const rawTitle = (completeResume as Record<string, unknown>).jobPostTitle;
+  const title =
+    typeof rawTitle === "string" && rawTitle.trim()
+      ? rawTitle.trim()
+      : hostnameOf(url);
+
   const createdResume = await prisma.resume.create({
     data: {
       userId: user.id,
+      title,
       templateId,
       URL: url,
       content: completeResume,
@@ -270,6 +287,49 @@ router.get(
         send("error", { message: "Unable to build the resume right now." });
       }
       return res.end();
+    }
+  },
+);
+
+// List the current user's previously-generated resumes (metadata only — the
+// pdf bytes are fetched per-resume via the /pdf endpoint below, e.g. for
+// thumbnails on the "My resumes" page).
+router.get(
+  "/:userId/resumes",
+  async (req: Request, res: Response) => {
+    const { userId } = req.params;
+
+    if (!req.user) {
+      return res.status(401).json({ error: "Please log in." });
+    }
+    const currentUser = req.user as User;
+    if (currentUser.id !== userId) {
+      return res
+        .status(403)
+        .json({ error: "You cannot access these resumes." });
+    }
+
+    try {
+      const resumes = await prisma.resume.findMany({
+        where: { userId: currentUser.id },
+        select: {
+          id: true,
+          title: true,
+          templateId: true,
+          URL: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return res.status(200).json({ resumes });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("[GET /:userId/resumes] Failed to list resumes:", error);
+      return res.status(500).json({
+        error: "Unable to load your resumes right now.",
+        detail: message,
+      });
     }
   },
 );

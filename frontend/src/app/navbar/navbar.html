@@ -10,6 +10,7 @@
       <li><button type="button" (click)="startCheckout('profile_setup', '/profile')">Profile</button></li>
       <li><button type="button" (click)="startCheckout('tailor_resume', '/tailor')">Tailor</button></li>
       <li><button type="button" (click)="startCheckout('view_templates', '/resume-templates')">Resume templates</button></li>
+      <li *ngIf="auth.user()"><a routerLink="/my-resumes" routerLinkActive="active">My resumes</a></li>
     </ul>
   </div>
 

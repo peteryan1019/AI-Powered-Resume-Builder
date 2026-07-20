@@ -1,4 +1,5 @@
 {
+  "jobPostTitle": "The exact job title from the job posting",
   "header": {
     "name": {
       "id": "header-name",

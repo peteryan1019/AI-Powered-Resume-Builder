@@ -2,6 +2,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "jobPostTitle": {
+      "type": "string"
+    },
     "header": {
       "type": "object",
       "additionalProperties": false,
@@ -295,5 +298,5 @@
       }
     }
   },
-  "required": ["header", "sections"]
+  "required": ["jobPostTitle", "header", "sections"]
 }

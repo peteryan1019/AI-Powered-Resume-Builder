@@ -36,6 +36,7 @@ model User {
 model Resume {
   id            String   @id @default(uuid())
   userId        String
+  title         String?
   templateId    String
   URL           String @map("jobPostingUrl")
   content       Json?

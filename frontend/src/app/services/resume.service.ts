@@ -21,6 +21,19 @@ export interface CreateResumeResponse {
   resume: CreatedResume;
 }
 
+/** Metadata for one previously-generated resume (no pdf bytes). */
+export interface ResumeSummary {
+  id: string;
+  title: string | null;
+  templateId: string;
+  URL: string;
+  createdAt: string;
+}
+
+export interface ListResumesResponse {
+  resumes: ResumeSummary[];
+}
+
 @Injectable({
   providedIn: "root",
 })
@@ -36,6 +49,16 @@ export class ResumeService {
     return this.http.post<CreateResumeResponse>(
       `${this.apiUrl}/users/${userId}/resumes`,
       request,
+      {
+        withCredentials: true,
+      },
+    );
+  }
+
+  /** Lists the user's previously-generated resumes, newest first. */
+  listResumes(userId: string): Observable<ListResumesResponse> {
+    return this.http.get<ListResumesResponse>(
+      `${this.apiUrl}/users/${userId}/resumes`,
       {
         withCredentials: true,
       },

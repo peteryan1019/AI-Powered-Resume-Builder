@@ -9,6 +9,7 @@ import { PaymentStartPage } from './features/payments/payment-start-page';
 import { PaymentSuccessPage } from './features/payments/payment-success-page';
 import { BuildStatusPage } from './features/resume-build/build-status-page';
 import { BuildResultPage } from './features/resume-build/build-result-page';
+import { MyResumesPage } from './features/resume-build/my-resumes-page';
 import { paymentGuard } from './features/payments/payment.guard';
 
 export const routes: Routes = [
@@ -16,7 +17,7 @@ export const routes: Routes = [
   { path: 'login', component: AuthPage, data: { mode: 'login' } },
   { path: 'signup', component: AuthPage, data: { mode: 'signup' } },
   { path: 'payment/start', component: PaymentStartPage, canActivate: [authGuard] },
-  { path: 'payment/success', component: PaymentSuccessPage, canActivate: [authGuard, paymentGuard] },
+  { path: 'payment/success', component: PaymentSuccessPage, canActivate: [authGuard] },
   {
     path: 'profile',
     component: ProfileSetupComponent,
@@ -25,6 +26,7 @@ export const routes: Routes = [
   { path: 'tailor', component: TailorPage, canActivate: [authGuard, paymentGuard] },
   { path: 'tailor/build/:jobId', component: BuildStatusPage, canActivate: [authGuard, paymentGuard] },
   { path: 'tailor/result/:jobId', component: BuildResultPage, canActivate: [authGuard, paymentGuard] },
+  { path: 'my-resumes', component: MyResumesPage, canActivate: [authGuard] },
   { path: 'resume-templates', component: ResumeTemplatesPage, canActivate: [authGuard, paymentGuard] },
   { path: '**', redirectTo: '' },
 ];
