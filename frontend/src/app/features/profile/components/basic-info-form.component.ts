@@ -10,8 +10,8 @@ import { Profile, ProfileUser } from '../profile.types';
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule],
   template: `
-    <div class="section-card">
-      <div class="section-header" (click)="expanded = !expanded">
+    <div class="section-card" [class.bare]="embedded">
+      <div class="section-header" *ngIf="!embedded" (click)="expanded = !expanded">
         <div class="section-title">
           <span class="section-dot"></span>
           <span class="section-name">Basic info</span>
@@ -21,7 +21,7 @@ import { Profile, ProfileUser } from '../profile.types';
         </button>
       </div>
 
-      <div class="section-body" *ngIf="expanded">
+      <div class="section-body" *ngIf="expanded || embedded">
         <form [formGroup]="form" (ngSubmit)="onSave()">
 
           <div class="basic-info-grid">
@@ -69,7 +69,7 @@ import { Profile, ProfileUser } from '../profile.types';
             </div>
           </div>
 
-          <div class="form-actions">
+          <div class="form-actions" *ngIf="!embedded">
             <span class="save-status saved" *ngIf="saveStatus === 'saved'">
               <i class="ti ti-check"></i> Saved
             </span>
@@ -89,6 +89,9 @@ export class BasicInfoFormComponent implements OnInit, OnChanges {
   @Input() profile: Profile | null = null;
   @Input() user: ProfileUser | null = null;
   @Input() saveStatus: 'idle' | 'saved' | 'error' = 'idle';
+  // Embedded mode (used by the onboarding wizard): hides the card header
+  // and the Save button — the wizard drives saving via save() + Next.
+  @Input() embedded = false;
   @Output() saved = new EventEmitter<Partial<Profile>>();
 
   form!: FormGroup;
@@ -132,5 +135,10 @@ export class BasicInfoFormComponent implements OnInit, OnChanges {
   onSave(): void {
     this.saved.emit(this.form.value);
     this.form.markAsPristine();
+  }
+
+  // Public entry point so a parent (the wizard) can trigger a save.
+  save(): void {
+    this.onSave();
   }
 }
