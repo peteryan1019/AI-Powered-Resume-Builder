@@ -9,6 +9,7 @@ import prisma from "../lib/prisma.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
 import { tailorResume } from "../services/test-gemini.js";
 import { finalResume } from "../services/check-gemini.js"
+import { AiModelUnavailableError } from "../services/geminiRetry.js";
 import type { User } from "../../generated/prisma/client.js";
 
 
@@ -203,6 +204,61 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
   }
 });
 
+router.post(
+  "/:userId/resumes/:jobId/retry",
+  async (req: Request, res: Response) => {
+    try {
+      const { userId, jobId } = req.params;
+
+      if (typeof userId !== "string" || typeof jobId !== "string") {
+        return res.status(400).json({ error: "Invalid build details." });
+      }
+
+      if (!req.user) {
+        return res.status(401).json({ error: "Please log in." });
+      }
+
+      const currentUser = req.user as User;
+      if (currentUser.id !== userId) {
+        return res
+          .status(403)
+          .json({ error: "You cannot retry this resume build." });
+      }
+
+      const previousJob = jobs.get(jobId);
+      if (!previousJob || previousJob.userId !== currentUser.id) {
+        return res.status(404).json({ error: "Build not found." });
+      }
+
+      if (previousJob.status !== "error") {
+        return res
+          .status(409)
+          .json({ error: "Only failed resume builds can be regenerated." });
+      }
+
+      pruneStaleJobs();
+
+      const newJobId = randomUUID();
+      jobs.set(newJobId, {
+        userId: currentUser.id,
+        url: previousJob.url,
+        templateId: previousJob.templateId,
+        status: "pending",
+        createdAt: Date.now(),
+      });
+
+      return res.status(201).json({ jobId: newJobId });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("[POST /:userId/resumes/:jobId/retry] Failed:", error);
+      return res.status(500).json({
+        error: "Unable to regenerate the resume right now.",
+        detail: message,
+      });
+    }
+  },
+);
+
 // SSE stream: runs the pipeline for a previously-registered job and emits a
 // `state` event per stage, a final `complete` event carrying the resumeId, or
 // an `error` event with a message.
@@ -284,7 +340,15 @@ router.get(
       );
       job.status = "error";
       if (!clientGone) {
-        send("error", { message: "Unable to build the resume right now." });
+        const isAiUnavailable = error instanceof AiModelUnavailableError;
+        send("build_error", {
+          message: isAiUnavailable
+            ? error.reason === "server_error"
+              ? "The AI model is temporarily unavailable. We tried 3 times, but the service kept returning server errors."
+              : "The AI model did not return a valid resume structure. We tried 3 times, but the response still did not match the required schema."
+            : "Unable to build the resume right now.",
+          canRegenerate: true,
+        });
       }
       return res.end();
     }
@@ -339,6 +403,10 @@ router.get(
   async (req: Request, res: Response) => {
     const { userId, resumeId } = req.params;
     const currentUser = req.user as { id: string };
+
+    if (typeof userId !== "string" || typeof resumeId !== "string") {
+      return res.status(400).json({ error: "Invalid resume details." });
+    }
 
     if (currentUser.id !== userId) {
       return res.status(403).json({

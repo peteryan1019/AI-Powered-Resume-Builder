@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../auth/auth.service';
 import { ResumeBuildService, ResumeBuildStep } from './resume-build.service';
@@ -14,7 +14,7 @@ interface DisplayStep {
 @Component({
   selector: 'app-build-status-page',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, RouterLink],
   template: `
     <section class="fsa-page">
       <div class="fsa-panel">
@@ -47,6 +47,19 @@ interface DisplayStep {
         </div>
 
         <p class="error" *ngIf="errorMessage()">{{ errorMessage() }}</p>
+
+        <div class="error-actions" *ngIf="errorMessage()">
+          <button
+            type="button"
+            class="primary-action"
+            *ngIf="canRegenerate()"
+            [disabled]="retrying()"
+            (click)="regenerate()"
+          >
+            {{ retrying() ? 'Regenerating...' : 'Regenerate resume' }}
+          </button>
+          <a class="secondary-action" routerLink="/tailor">Back to tailor</a>
+        </div>
       </div>
     </section>
   `,
@@ -237,6 +250,53 @@ interface DisplayStep {
         margin: 2rem 0 0;
         color: #ff9d9d;
       }
+      .error-actions {
+        display: flex;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+      }
+      .primary-action,
+      .secondary-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.5rem;
+        padding: 0.65rem 1.25rem;
+        border-radius: 0.5rem;
+        border: 0;
+        font: inherit;
+        font-size: 0.9rem;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        transition:
+          transform 0.16s ease,
+          box-shadow 0.16s ease,
+          background 0.16s ease;
+      }
+      .primary-action {
+        background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+        color: #fff;
+        box-shadow: 0 12px 28px -14px rgba(66, 133, 244, 0.8);
+      }
+      .primary-action:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 16px 32px -14px rgba(66, 133, 244, 0.9);
+      }
+      .primary-action:disabled {
+        cursor: wait;
+        opacity: 0.66;
+      }
+      .secondary-action {
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--ink);
+      }
+      .secondary-action:hover {
+        background: rgba(255, 255, 255, 0.12);
+      }
 
       @media (max-width: 620px) {
         .automaton {
@@ -271,22 +331,69 @@ export class BuildStatusPage implements OnInit, OnDestroy {
   readonly activeIndex = signal(0);
   readonly completed = signal(false);
   readonly errorMessage = signal<string | null>(null);
+  readonly canRegenerate = signal(false);
+  readonly retrying = signal(false);
 
   readonly headline = computed(() =>
-    this.completed() ? 'All set!' : this.displaySteps[this.activeIndex()].label,
+    this.errorMessage()
+      ? 'Resume build stopped'
+      : this.completed()
+        ? 'All set!'
+        : this.displaySteps[this.activeIndex()].label,
   );
 
   private source?: EventSource;
+  private jobId: string | null = null;
+  private userId: string | null = null;
 
   ngOnInit(): void {
-    const jobId = this.route.snapshot.paramMap.get('jobId');
-    const userId = this.auth.user()?.id;
+    this.jobId = this.route.snapshot.paramMap.get('jobId');
+    this.userId = this.auth.user()?.id ?? null;
 
-    if (!jobId || !userId) {
+    if (!this.jobId || !this.userId) {
       this.errorMessage.set('Missing build details. Please start again from the tailor page.');
       return;
     }
 
+    this.openEventStream(this.userId, this.jobId);
+  }
+
+  ngOnDestroy(): void {
+    this.source?.close();
+  }
+
+  regenerate(): void {
+    if (!this.userId || !this.jobId || this.retrying()) {
+      return;
+    }
+
+    const userId = this.userId;
+    const currentJobId = this.jobId;
+    this.retrying.set(true);
+    this.resumeBuild.retryBuild(userId, currentJobId).subscribe({
+      next: ({ jobId }) => {
+        this.source?.close();
+        this.jobId = jobId;
+        this.activeIndex.set(0);
+        this.completed.set(false);
+        this.errorMessage.set(null);
+        this.canRegenerate.set(false);
+        this.retrying.set(false);
+        this.openEventStream(userId, jobId);
+        void this.router.navigate(['/tailor/build', jobId], {
+          replaceUrl: true,
+        });
+      },
+      error: (error) => {
+        this.retrying.set(false);
+        this.errorMessage.set(
+          error?.error?.error ?? 'Unable to regenerate the resume right now.',
+        );
+      },
+    });
+  }
+
+  private openEventStream(userId: string, jobId: string): void {
     this.source = new EventSource(this.resumeBuild.eventsUrl(userId, jobId), {
       withCredentials: true,
     });
@@ -308,16 +415,25 @@ export class BuildStatusPage implements OnInit, OnDestroy {
       void this.router.navigate(['/tailor/result', resumeId]);
     });
 
+    this.source.addEventListener('build_error', (event) => {
+      const data = JSON.parse((event as MessageEvent).data) as {
+        canRegenerate?: boolean;
+        message?: string;
+      };
+      this.errorMessage.set(
+        data.message ?? 'Unable to build the resume right now.',
+      );
+      this.canRegenerate.set(data.canRegenerate === true);
+      this.source?.close();
+    });
+
     this.source.addEventListener('error', () => {
       // A clean server close also surfaces as `error`; only report if we never finished.
-      if (!this.completed()) {
+      if (!this.completed() && !this.errorMessage()) {
         this.errorMessage.set('Lost connection while building your resume. Please try again.');
+        this.canRegenerate.set(false);
         this.source?.close();
       }
     });
-  }
-
-  ngOnDestroy(): void {
-    this.source?.close();
   }
 }

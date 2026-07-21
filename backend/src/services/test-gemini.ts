@@ -2,6 +2,11 @@ import type { ExportedProfile } from "../lib/profileExport.js";
 import { loadResumeTemplate } from "../lib/templateRegistry.js";
 import { loadResumeSchema } from "../lib/schema.js";
 import type { Prisma } from "../../generated/prisma/client.js";
+import {
+  FASTEST_GEMINI_TEXT_MODEL,
+  retryAiModelRequest,
+} from "./geminiRetry.js";
+import { parseAndValidateResumeOutput } from "./resumeSchemaValidation.js";
 import "dotenv/config";
 
 import { GoogleGenAI } from "@google/genai";
@@ -26,10 +31,11 @@ export async function tailorResume(input: TailorResumeInput): Promise<Prisma.Inp
     loadResumeSchema(),
   ]);
 
-  const interaction = await ai.interactions.create({
-    model: "gemini-3.5-flash",
+  return retryAiModelRequest("tailor resume", async () => {
+    const interaction = await ai.interactions.create({
+      model: FASTEST_GEMINI_TEXT_MODEL,
 
-    input: `
+      input: `
     Tailor this resume to the job posting.
 
     JOB POSTING URL:
@@ -50,35 +56,16 @@ export async function tailorResume(input: TailorResumeInput): Promise<Prisma.Inp
     - Return JSON only.
     `,
 
-    tools: [
-      {
-        type: "url_context",
+      tools: [
+        {
+          type: "url_context",
+        },
+      ],
+
+      response_format: {type: "text", mime_type: "application/json", schema: resumeSchema,
       },
-    ],
+    });
 
-    response_format: {type: "text", mime_type: "application/json", schema: resumeSchema,
-    },
+    return parseAndValidateResumeOutput(interaction.output_text, resumeSchema);
   });
-
-  const outputText = interaction.output_text;
-
-  if (typeof outputText !== "string" || outputText.trim() === "") {
-    throw new Error("Gemini returned an empty response.");
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(outputText);
-
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      throw new Error("Gemini returned JSON that was not an object.");
-    }
-
-    return parsed as Prisma.InputJsonObject;
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message === "Gemini returned JSON that was not an object.") {
-      throw error;
-    }
-
-    throw new Error("Gemini returned invalid JSON.");
-  }
 }

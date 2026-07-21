@@ -36,6 +36,14 @@ export class ResumeBuildService {
     );
   }
 
+  retryBuild(userId: string, jobId: string): Observable<{ jobId: string }> {
+    return this.http.post<{ jobId: string }>(
+      `${this.apiUrl}/users/${userId}/resumes/${jobId}/retry`,
+      {},
+      { withCredentials: true },
+    );
+  }
+
   eventsUrl(userId: string, jobId: string): string {
     return `${this.apiUrl}/users/${userId}/resumes/${jobId}/events`;
   }
