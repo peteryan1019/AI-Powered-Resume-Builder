@@ -10,6 +10,7 @@ import { AuthService } from '../auth/auth.service';
 import { Profile, SectionType, SECTION_CONFIG } from './profile.types';
 import { BasicInfoFormComponent } from './components/basic-info-form.component';
 import { SectionCardComponent } from './components/section-card.component';
+import { ProfileWizardComponent } from './profile-wizard.component';
 
 @Component({
   selector: 'app-profile-setup',
@@ -21,9 +22,16 @@ import { SectionCardComponent } from './components/section-card.component';
     DragDropModule,
     BasicInfoFormComponent,
     SectionCardComponent,
+    ProfileWizardComponent,
   ],
   template: `
-    <div class="profile-layout">
+    <!-- First-time guided setup (only for logged-in users with an empty profile). -->
+    <app-profile-wizard
+      *ngIf="auth.isAuthenticated() && mode() === 'wizard'"
+      (done)="onWizardDone()"
+    />
+
+    <div class="profile-layout" *ngIf="!(auth.isAuthenticated() && mode() === 'wizard')">
 
       <!-- Sidebar -->
       <nav class="profile-sidebar">
@@ -59,6 +67,12 @@ import { SectionCardComponent } from './components/section-card.component';
             <button class="btn-primary" (click)="confirmAddSection()">Add</button>
           </div>
         </div>
+
+        <hr class="nav-divider" />
+
+        <button class="nav-item" (click)="startWizard()">
+          <i class="ti ti-wand"></i> Guided setup
+        </button>
       </nav>
 
       <!-- Main content -->
@@ -140,6 +154,10 @@ export class ProfileSetupComponent implements OnInit {
   // overlay before we know whether the user is actually logged in.
   sessionChecked = signal(false);
   loginPromptVisible = signal(false);
+  // 'wizard' = first-time guided setup; 'dashboard' = normal editing.
+  mode = signal<'wizard' | 'dashboard'>('dashboard');
+
+  private static readonly ONBOARDED_KEY = 'tailr.onboardingDone';
 
   sectionConfig = SECTION_CONFIG;
   sectionTypes = Object.keys(SECTION_CONFIG) as SectionType[];
@@ -159,7 +177,12 @@ export class ProfileSetupComponent implements OnInit {
     this.auth.loadSession().subscribe((user) => {
       this.sessionChecked.set(true);
       if (user) {
-        this.profileService.loadProfile().subscribe();
+        this.profileService.loadProfile().subscribe(({ profile }) => {
+          // First-time users (empty profile, never onboarded) get the wizard.
+          if (this.isProfileEmpty(profile) && !this.hasOnboarded()) {
+            this.mode.set('wizard');
+          }
+        });
       }
     });
   }
@@ -197,6 +220,39 @@ export class ProfileSetupComponent implements OnInit {
     this.profileService.moveSection(event.previousIndex, event.currentIndex).subscribe({
       error: () => this.profileService.loadProfile().subscribe(),
     });
+  }
+
+  // ── Onboarding wizard ───────────────────
+  startWizard(): void {
+    this.mode.set('wizard');
+  }
+
+  onWizardDone(): void {
+    this.markOnboarded();
+    this.mode.set('dashboard');
+    this.profileService.loadProfile().subscribe();
+  }
+
+  private isProfileEmpty(profile: Profile | null): boolean {
+    if (!profile) return true;
+    const hasBasics = !!(profile.headline || profile.phone || profile.location || profile.summary);
+    return !hasBasics && profile.sections.length === 0;
+  }
+
+  private hasOnboarded(): boolean {
+    try {
+      return localStorage.getItem(ProfileSetupComponent.ONBOARDED_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  private markOnboarded(): void {
+    try {
+      localStorage.setItem(ProfileSetupComponent.ONBOARDED_KEY, '1');
+    } catch {
+      /* ignore storage failures */
+    }
   }
 
   openAddSectionModal(): void {
