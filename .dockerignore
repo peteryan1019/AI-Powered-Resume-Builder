@@ -1,0 +1,11 @@
+# Context for the backend image is the repo root. Keep it small and never ship secrets.
+**/node_modules
+.git
+frontend
+backend/generated
+backend/dist
+**/.env
+.env
+*.log
+.claude
+.DS_Store

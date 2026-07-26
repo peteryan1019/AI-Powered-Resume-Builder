@@ -35,7 +35,15 @@ function safeCheckoutAction(value: unknown): string | null {
   return typeof value === 'string' && /^[a-z0-9_:-]{1,80}$/i.test(value) ? value : null;
 }
 
-app.use(cors({ origin: 'http://localhost:4200', credentials: true}));
+// Trust the reverse proxy (nginx) so secure cookies work behind TLS termination.
+app.set('trust proxy', 1);
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:4200',
+    credentials: true,
+  }),
+);
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
 app.use(express.json());
 
@@ -47,7 +55,8 @@ app.use(
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: false,
+      // Send the cookie over HTTPS only in production (behind the TLS proxy).
+      secure: process.env.NODE_ENV === "production",
     },
   })
 );
