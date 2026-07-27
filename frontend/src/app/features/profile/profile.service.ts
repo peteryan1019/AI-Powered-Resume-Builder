@@ -158,4 +158,15 @@ export class ProfileService {
         })
       );
   }
+
+  importResume(file: File) {
+    const formData = new FormData();
+    formData.append('resume', file);
+
+    return this.http.post<{ profile: unknown }>(
+      '/api/profile/import',
+      formData,
+      { withCredentials: true }
+    );
+  }
 }
