@@ -315,6 +315,118 @@ RESUME_DATA2 = {'jobPostTitle': 'Backend Engineer',
 # }
 
 
+def _s(value) -> str:
+    """Coerce a possibly missing/None/non-string field to a stripped string."""
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _clean_bullet(bullet: dict) -> Optional[dict]:
+    """Drop a bullet's blank parts; return None when nothing is left to draw."""
+    label, text, url = _s(bullet.get("label")), _s(bullet.get("text")), _s(bullet.get("url"))
+    if not (label or text or url):
+        return None
+    cleaned = {"id": bullet.get("id", "")}
+    if label:
+        cleaned["label"] = label
+    if text:
+        cleaned["text"] = text
+    if url:
+        cleaned["url"] = url
+    return cleaned
+
+
+def _clean_bullets(bullets) -> List[dict]:
+    return [b for b in (_clean_bullet(x) for x in (bullets or [])) if b]
+
+
+def prune_resume_data(data: dict) -> dict:
+    """Strip blank strings and empty containers so nothing renders as a gap.
+
+    The JSON schema only guarantees that keys are *present*, never that they
+    carry content: a section may legitimately arrive with `bullets: []` (the
+    user has no such credential) and every required string may be "". Rendering
+    those verbatim leaves orphan bullet glyphs, headings with no body, and
+    section rules with nothing beneath them. Pruning up front — before any
+    layout pass — means the empty parts consume no ink *and* no vertical space,
+    and keeps the measure and draw passes in agreement.
+
+    Content is never discarded: a block survives if any of its parts survive.
+    """
+    header = data.get("header") or {}
+    contact = header.get("contact") or {}
+    pruned_header = {
+        "name": {
+            "id": (header.get("name") or {}).get("id", ""),
+            "text": _s((header.get("name") or {}).get("text")),
+        },
+        "contact": {
+            "id": contact.get("id", ""),
+            # A part with blank text would otherwise render as a stray " • ".
+            "parts": [p for p in (contact.get("parts") or []) if _s(p.get("text"))],
+        },
+    }
+
+    sections: List[dict] = []
+    for section in data.get("sections") or []:
+        kind = section.get("type")
+        base = {
+            "id": section.get("id", ""),
+            "title": _s(section.get("title")),
+            "type": kind,
+        }
+
+        if kind == "bullets":
+            bullets = _clean_bullets(section.get("bullets"))
+            if bullets:
+                sections.append({**base, "bullets": bullets})
+
+        elif kind == "entries":
+            entries = []
+            for entry in section.get("entries") or []:
+                bullets = _clean_bullets(entry.get("bullets"))
+                heading, meta, date = (
+                    _s(entry.get("heading")), _s(entry.get("meta")), _s(entry.get("date")),
+                )
+                if heading or meta or date or bullets:
+                    entries.append({
+                        "id": entry.get("id", ""), "heading": heading,
+                        "meta": meta, "date": date, "bullets": bullets,
+                    })
+            if entries:
+                sections.append({**base, "entries": entries})
+
+        elif kind == "org_entries":
+            entries = []
+            for entry in section.get("entries") or []:
+                bullets = _clean_bullets(entry.get("bullets"))
+                org, role, location, date = (
+                    _s(entry.get("org")), _s(entry.get("role")),
+                    _s(entry.get("location")), _s(entry.get("date")),
+                )
+                if org or role or location or date or bullets:
+                    entries.append({
+                        "id": entry.get("id", ""), "org": org, "role": role,
+                        "location": location, "date": date, "bullets": bullets,
+                    })
+            if entries:
+                sections.append({**base, "entries": entries})
+
+        elif kind == "education":
+            school = section.get("school") or {}
+            school_text = _s(school.get("text"))
+            bullets = _clean_bullets(section.get("bullets"))
+            if school_text or bullets:
+                sections.append({
+                    **base,
+                    "school": {"id": school.get("id", ""), "text": school_text},
+                    "bullets": bullets,
+                })
+
+        # An unrecognised section type has no renderer, so it is dropped.
+
+    return {**data, "header": pruned_header, "sections": sections}
+
+
 def apply_text_updates(data: dict, updates_by_id: Dict[str, str]) -> dict:
     """Mutate text/label fields whose id exists in updates_by_id (AI API output)."""
     def walk(obj):
@@ -376,7 +488,7 @@ class ResumePDF:
 
     def _inline(self, x, baseline, runs, center=False, box_id=None):
         """Draw styled runs on a single line. Each run: dict(text, font, size, color, href?)."""
-        if self.measure:  # single lines don't advance self.y; nothing to measure
+        if self.measure or not runs:  # single lines don't advance self.y; nothing to measure
             return
         total = sum(stringWidth(r["text"], r["font"], r["size"]) for r in runs)
         start_x = (PAGE_W - total) / 2.0 if center else x
@@ -395,7 +507,9 @@ class ResumePDF:
     # -- blocks ---------------------------------------------------------------
     def _section_title(self, section_id, title, first):
         self.y -= self._flex(SECTION_GAP_FIRST if first else SECTION_GAP)
-        if self.measure:
+        # A blank title must not leave the divider rule floating on its own; the
+        # section's content still renders below.
+        if self.measure or not title:
             return
         self._text(LEFT, self.y, title, FONT_BOLD, self.title_sz, ACCENT)
         rule_y = self.y - RULE_DROP * self.font_scale
@@ -406,23 +520,23 @@ class ResumePDF:
 
     def _bullet_tokens(self, b):
         """Return a flat list of styled word-tokens for one bullet."""
+        # label / text / url are independent: a bullet may carry any combination
+        # (an if/elif chain here would silently swallow the url of a bullet that
+        # also has a label). Blank parts contribute no tokens.
         toks: List[dict] = []
-        if "label" in b:  # technical-skill bullet with a bold lead label
-            for w in b["label"].split():
-                toks.append({"text": w, "font": FONT_BOLD, "color": BLACK})
-            for w in b.get("text", "").split():
-                toks.append({"text": w, "font": FONT, "color": BLACK})
-        elif "url" in b:  # prose prefix followed by a hyperlinked URL
-            for w in b.get("text", "").split():
-                toks.append({"text": w, "font": FONT, "color": BLACK})
-            toks.append({"text": b["url"], "font": FONT, "color": LINK, "href": b["url"]})
-        else:
-            for w in b.get("text", "").split():
-                toks.append({"text": w, "font": FONT, "color": BLACK})
+        for w in _s(b.get("label")).split():  # bold lead label
+            toks.append({"text": w, "font": FONT_BOLD, "color": BLACK})
+        for w in _s(b.get("text")).split():
+            toks.append({"text": w, "font": FONT, "color": BLACK})
+        url = _s(b.get("url"))
+        if url:  # hyperlinked URL, kept whole by the wrapper
+            toks.append({"text": url, "font": FONT, "color": LINK, "href": url})
         return toks
 
-    def _bullet(self, bullet_id, tokens):
+    def _bullet(self, bullet_id, tokens) -> bool:
         size = self.body
+        if not tokens:  # nothing to say: draw no orphan glyph and consume no line
+            return False
         # greedy word-wrap into lines (URLs stay whole)
         lines: List[List[dict]] = [[]]
         cur_w = 0.0
@@ -455,87 +569,134 @@ class ResumePDF:
         self.y -= (len(lines) - 1) * self.line
         if not self.measure:
             self.elements[bullet_id] = (BULLET_TEXT_X, self.y, BULLET_MAX_W, top_y - self.y + size)
+        return True
 
-    def _heading(self, entry_id, title, meta, date):
-        runs = [{"text": title, "font": FONT_BOLD, "size": self.body, "color": BLACK}]
-        if meta:
-            runs.append({"text": SEP_HEADING, "font": FONT, "size": self.body, "color": BLACK})
-            runs.append({"text": meta, "font": FONT_ITALIC, "size": self.body, "color": META_GRAY})
-        if date:
-            runs.append({"text": SEP_HEADING, "font": FONT, "size": self.body, "color": BLACK})
-            runs.append({"text": date, "font": FONT, "size": self.body, "color": CONTACT_GRAY})
+    def _joined(self, parts, sep) -> List[dict]:
+        """Build one line's runs, separating only the parts that are non-blank.
+
+        Blank parts are skipped without leaving a dangling separator (a blank
+        leading part would otherwise render the line as " • Toronto • 2025").
+        """
+        runs: List[dict] = []
+        for text, font, color in parts:
+            if not text:
+                continue
+            if runs:
+                runs.append({"text": sep, "font": FONT, "size": self.body, "color": BLACK})
+            runs.append({"text": text, "font": font, "size": self.body, "color": color})
+        return runs
+
+    def _heading(self, entry_id, title, meta, date) -> bool:
+        runs = self._joined([
+            (_s(title), FONT_BOLD, BLACK),
+            (_s(meta), FONT_ITALIC, META_GRAY),
+            (_s(date), FONT, CONTACT_GRAY),
+        ], SEP_HEADING)
+        if not runs:
+            return False
         self._inline(LEFT, self.y, runs, box_id=entry_id)
+        return True
 
-    def _role_line(self, role, location, date):
-        runs = [{"text": role, "font": FONT, "size": self.body, "color": BLACK}]
-        if location:
-            runs.append({"text": SEP_ROLE, "font": FONT, "size": self.body, "color": BLACK})
-            runs.append({"text": location, "font": FONT_ITALIC, "size": self.body, "color": META_GRAY})
-        if date:
-            runs.append({"text": SEP_ROLE, "font": FONT, "size": self.body, "color": BLACK})
-            runs.append({"text": date, "font": FONT, "size": self.body, "color": CONTACT_GRAY})
+    def _role_line(self, role, location, date) -> bool:
+        runs = self._joined([
+            (_s(role), FONT, BLACK),
+            (_s(location), FONT_ITALIC, META_GRAY),
+            (_s(date), FONT, CONTACT_GRAY),
+        ], SEP_ROLE)
+        if not runs:
+            return False
         self._inline(LEFT, self.y, runs)
+        return True
 
     # -- document -------------------------------------------------------------
     def build(self, data: dict) -> Dict[str, object]:
-        header = data["header"]
+        header = data.get("header") or {}
+        name = header.get("name") or {}
+        name_text = _s(name.get("text"))
         if not self.measure:
-            self.c.setTitle(f"{header['name']['text']} Resume")
+            self.c.setTitle(f"{name_text} Resume".strip())
 
-        # Name (centered, accent)
-        self._text((PAGE_W - stringWidth(header["name"]["text"], FONT_BOLD, self.name_sz)) / 2.0,
-                   self.y, header["name"]["text"], FONT_BOLD, self.name_sz, ACCENT)
-        self.elements[header["name"]["id"]] = (LEFT, self.y, CONTENT_W, self.name_sz)
+        # Name (centered, accent). A blank name draws nothing and, so the page
+        # keeps no reserved hole, consumes no line either.
+        drawn = bool(name_text)
+        if drawn:
+            self._text((PAGE_W - stringWidth(name_text, FONT_BOLD, self.name_sz)) / 2.0,
+                       self.y, name_text, FONT_BOLD, self.name_sz, ACCENT)
+            self.elements[name.get("id", "")] = (LEFT, self.y, CONTENT_W, self.name_sz)
 
-        # Contact line (centered, with hyperlinks)
-        self.y -= self._rigid(NAME_TO_CONTACT)
-        contact = header["contact"]
+        # Contact line (centered, with hyperlinks). Blank parts were pruned, so
+        # the separators never bracket an empty slot.
+        contact = header.get("contact") or {}
         runs = []
-        for i, part in enumerate(contact["parts"]):
-            if i > 0:
+        for part in contact.get("parts") or []:
+            text = _s(part.get("text"))
+            if not text:
+                continue
+            if runs:
                 runs.append({"text": SEP_CONTACT, "font": FONT, "size": self.body, "color": CONTACT_GRAY})
-            runs.append({"text": part["text"], "font": FONT, "size": self.body,
+            runs.append({"text": text, "font": FONT, "size": self.body,
                          "color": LINK if part.get("href") else CONTACT_GRAY,
                          "href": part.get("href")})
-        self._inline(0, self.y, runs, center=True, box_id=contact["id"])
+        if runs:
+            if drawn:
+                self.y -= self._rigid(NAME_TO_CONTACT)
+            self._inline(0, self.y, runs, center=True, box_id=contact.get("id", ""))
 
-        for si, section in enumerate(data["sections"]):
-            self._section_title(section["id"], section["title"], first=(si == 0))
+        # Every block below advances self.y only once something has actually been
+        # drawn, so a skipped part leaves no blank line behind it.
+        for si, section in enumerate(data.get("sections") or []):
+            self._section_title(section.get("id", ""), _s(section.get("title")), first=(si == 0))
             block = BLOCK_SPACE
 
             if section["type"] == "bullets":
                 self.y -= self._rigid(TITLE_TO_CONTENT) + self._flex(block)
-                for j, b in enumerate(section["bullets"]):
-                    if j > 0:
+                drawn = False
+                for b in section.get("bullets") or []:
+                    if drawn:
                         self.y -= self.line
-                    self._bullet(b["id"], self._bullet_tokens(b))
+                    drawn = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or drawn
 
             elif section["type"] == "entries":
-                for ei, entry in enumerate(section["entries"]):
+                for ei, entry in enumerate(section.get("entries") or []):
                     self.y -= self._rigid(TITLE_TO_CONTENT if ei == 0 else LINE) + self._flex(block)
-                    self._heading(entry["id"], entry["heading"], entry.get("meta"), entry.get("date", ""))
-                    for b in entry.get("bullets", []):
-                        self.y -= self.line
-                        self._bullet(b["id"], self._bullet_tokens(b))
+                    drawn = self._heading(entry.get("id", ""), entry.get("heading"),
+                                          entry.get("meta"), entry.get("date"))
+                    for b in entry.get("bullets") or []:
+                        if drawn:
+                            self.y -= self.line
+                        drawn = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or drawn
 
             elif section["type"] == "org_entries":
-                for ei, entry in enumerate(section["entries"]):
+                for ei, entry in enumerate(section.get("entries") or []):
                     self.y -= self._rigid(TITLE_TO_CONTENT if ei == 0 else LINE) + self._flex(block)
-                    self._text(LEFT, self.y, entry["org"], FONT_BOLD, self.body, BLACK)
-                    self.elements[entry["id"]] = (LEFT, self.y, CONTENT_W, self.body)
-                    self.y -= self.line
-                    self._role_line(entry["role"], entry.get("location", ""), entry.get("date", ""))
-                    for b in entry.get("bullets", []):
-                        self.y -= self.line
-                        self._bullet(b["id"], self._bullet_tokens(b))
+                    org = _s(entry.get("org"))
+                    drawn = bool(org)
+                    if drawn:
+                        self._text(LEFT, self.y, org, FONT_BOLD, self.body, BLACK)
+                        self.elements[entry.get("id", "")] = (LEFT, self.y, CONTENT_W, self.body)
+                    # Only claim the second line if the role line has content.
+                    if any(_s(entry.get(k)) for k in ("role", "location", "date")):
+                        if drawn:
+                            self.y -= self.line
+                        drawn = self._role_line(entry.get("role"), entry.get("location"),
+                                                entry.get("date")) or drawn
+                    for b in entry.get("bullets") or []:
+                        if drawn:
+                            self.y -= self.line
+                        drawn = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or drawn
 
             elif section["type"] == "education":
                 self.y -= self._rigid(TITLE_TO_CONTENT) + self._flex(block)
-                self._text(LEFT, self.y, section["school"]["text"], FONT_BOLD, self.body, BLACK)
-                self.elements[section["school"]["id"]] = (LEFT, self.y, CONTENT_W, self.body)
-                for b in section["bullets"]:
-                    self.y -= self.line
-                    self._bullet(b["id"], self._bullet_tokens(b))
+                school = section.get("school") or {}
+                school_text = _s(school.get("text"))
+                drawn = bool(school_text)
+                if drawn:
+                    self._text(LEFT, self.y, school_text, FONT_BOLD, self.body, BLACK)
+                    self.elements[school.get("id", "")] = (LEFT, self.y, CONTENT_W, self.body)
+                for b in section.get("bullets") or []:
+                    if drawn:
+                        self.y -= self.line
+                    drawn = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or drawn
 
         if not self.measure:
             self.c.showPage()
@@ -573,6 +734,9 @@ def create_resume_pdf(output_path: str, RESUME_DATA: Optional[dict] = None, upda
     data = copy.deepcopy(RESUME_DATA2 if RESUME_DATA is None else RESUME_DATA )
     if updates_by_id:
         data = apply_text_updates(data, updates_by_id)
+    # Prune before any layout pass so the measure and draw passes agree, and so
+    # skipped parts cost no vertical space in the fit/balance calculation.
+    data = prune_resume_data(data)
 
     usable = PAGE_H - 2 * MIN_MARGIN
 
@@ -611,6 +775,10 @@ def create_resume_pdf(output_path: str, RESUME_DATA: Optional[dict] = None, upda
 
     bottom_blank = PAGE_H - top_blank - block
     result.update({
+        # Pruning makes an empty payload render as a clean but near-blank page,
+        # which no longer looks like a failure. Report what actually survived so
+        # the caller can decide whether the result is worth keeping.
+        "sections_rendered": len(data["sections"]),
         "fits_one_page": block <= usable + 0.5,
         "font_size_used": round(BODY_SIZE * font_scale, 2),
         "font_scale": round(font_scale, 3),

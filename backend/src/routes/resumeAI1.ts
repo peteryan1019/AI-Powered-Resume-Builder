@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import prisma from "../lib/prisma.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
+import { createStepTimer } from "../lib/timing.js";
 import { tailorResume } from "../services/test-gemini.js";
 import { finalResume } from "../services/check-gemini.js"
 import { AiModelUnavailableError } from "../services/geminiRetry.js";
@@ -92,62 +93,82 @@ function resolveGeneratorPath(templateId: string): string {
  */
 async function runBuildPipeline(
   user: User,
-  input: { url: string; templateId: string },
+  input: { url: string; templateId: string; jobId: string },
   emit: (state: BuildState) => void,
 ): Promise<string> {
-  const { url, templateId } = input;
+  const { url, templateId, jobId } = input;
 
-  const exportedProfile = await getExportedProfile(user);
+  // Builds run concurrently, so every timing line carries a short job id to
+  // keep interleaved console output attributable to one build.
+  const timer = createStepTimer(`[resume-build ${jobId.slice(0, 8)}]`);
 
-  emit("generating");
-  const tailoredResume = await tailorResume({
-    userProfile: exportedProfile,
-    URL: url,
-    templateId,
-  });
+  try {
+    const exportedProfile = await timer.step("load profile", () =>
+      getExportedProfile(user),
+    );
 
-  emit("checking");
-  const completeResume = await finalResume(tailoredResume, {
-    userProfile: exportedProfile,
-    URL: url,
-    templateId,
-  });
+    emit("generating");
+    const tailoredResume = await timer.step("ai tailor", () =>
+      tailorResume({
+        userProfile: exportedProfile,
+        URL: url,
+        templateId,
+      }),
+    );
 
-  emit("generating_pdf");
-  const gPath = resolveGeneratorPath(templateId);
-  const oPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`);
+    emit("checking");
+    const completeResume = await timer.step("ai review", () =>
+      finalResume(tailoredResume, {
+        userProfile: exportedProfile,
+        URL: url,
+        templateId,
+      }),
+    );
 
-  const pythonProcess = spawn(PYTHON_BIN, [gPath, oPath]);
-  pythonProcess.stdin.end(JSON.stringify(completeResume));
+    emit("generating_pdf");
+    const gPath = resolveGeneratorPath(templateId);
+    const oPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`);
 
-  const [exitCode] = (await once(pythonProcess, "close")) as [number];
-  if (exitCode !== 0) {
-    throw new Error("PDF generation failed.");
+    const pdfData = await timer.step("render pdf", async () => {
+      const pythonProcess = spawn(PYTHON_BIN, [gPath, oPath]);
+      pythonProcess.stdin.end(JSON.stringify(completeResume));
+
+      const [exitCode] = (await once(pythonProcess, "close")) as [number];
+      if (exitCode !== 0) {
+        throw new Error("PDF generation failed.");
+      }
+
+      const bytes = await readFile(oPath);
+      await unlink(oPath);
+      return bytes;
+    });
+
+    // Title the resume after the job post. The AI emits `jobPostTitle` per the
+    // schema; fall back to the posting hostname if it's missing/blank.
+    const rawTitle = (completeResume as Record<string, unknown>).jobPostTitle;
+    const title =
+      typeof rawTitle === "string" && rawTitle.trim()
+        ? rawTitle.trim()
+        : hostnameOf(url);
+
+    const createdResume = await timer.step("save resume", () =>
+      prisma.resume.create({
+        data: {
+          userId: user.id,
+          title,
+          templateId,
+          URL: url,
+          content: completeResume,
+          pdfData,
+        },
+      }),
+    );
+
+    return createdResume.id;
+  } finally {
+    // Runs on the failure path too, so a broken build still prints its total.
+    timer.done();
   }
-
-  const pdfData = await readFile(oPath);
-  await unlink(oPath);
-
-  // Title the resume after the job post. The AI emits `jobPostTitle` per the
-  // schema; fall back to the posting hostname if it's missing/blank.
-  const rawTitle = (completeResume as Record<string, unknown>).jobPostTitle;
-  const title =
-    typeof rawTitle === "string" && rawTitle.trim()
-      ? rawTitle.trim()
-      : hostnameOf(url);
-
-  const createdResume = await prisma.resume.create({
-    data: {
-      userId: user.id,
-      title,
-      templateId,
-      URL: url,
-      content: completeResume,
-      pdfData,
-    },
-  });
-
-  return createdResume.id;
 }
 
 // Kick off a build: validate inputs, register a pending job, hand back a jobId
@@ -312,7 +333,7 @@ router.get(
     try {
       const resumeId = await runBuildPipeline(
         currentUser,
-        { url: job.url, templateId: job.templateId },
+        { url: job.url, templateId: job.templateId, jobId },
         (state) => {
           if (clientGone) return;
           const meta = STAGE_META[state];
