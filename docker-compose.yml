@@ -67,6 +67,7 @@ services:
       - STRIPE_PRICE_ID=${STRIPE_PRICE_ID}
       - APIKEY_1=${APIKEY_1}
       - APIKEY_2=${APIKEY_2}
+      - APIKEY_3=${APIKEY_3}
 
   frontend:
     image: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder
