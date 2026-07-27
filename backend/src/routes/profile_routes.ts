@@ -3,8 +3,22 @@
 import { Router, type Request, type Response } from 'express';
 import prisma from '../lib/prisma.js';
 import { buildHeaders, formatInstance } from '../lib/profileExport.js';
+import multer from 'multer';
+import { extractResume } from "../services/parse-gemini.js"
+import { autoFill } from "../services/autofill.js"
 
 const router = Router();
+
+const upload = multer({storage: multer.memoryStorage(), limits: {fileSize: 5 * 1024 * 1024,}, 
+fileFilter: (_req, file, callback) => {
+    if (file.mimetype !== 'application/pdf') {
+      return callback(new Error('Only PDF files are allowed'));
+    }
+
+    callback(null, true);
+}
+
+});
 
 const profileInclude = {
   sections: {
@@ -259,6 +273,43 @@ router.delete('/sections/:sectionId/instances/:instanceId', async (req: Request,
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: 'Failed to delete instance' });
+  }
+});
+
+// ─────────────────────────────────────────
+// POST /api/profile/import
+// ─────────────────────────────────────────
+router.post('/import',  upload.single('resume'), async(req: Request, res: Response) => {
+  try{
+    const userId = req.user!.id;
+    const file = req.file;
+
+    if(!file){
+      return res.status(400).json({error: "Please import your resume in a PDF format"});
+    }
+
+    if(!(file.buffer.subarray(0, 5).toString()=='%PDF-')){
+      return res.status(400).json({error: "Please import a valid PDF document"});
+    }
+
+    const pdfBuffer = file.buffer;
+    const resumeInfo = await extractResume(pdfBuffer);
+    const profile = await autoFill(userId, resumeInfo, {resumeFileName: file.originalname});
+
+    return res.status(200).json({profile});
+
+
+  } catch(error){
+      console.error('Resume import error:', error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unknown resume import error';
+
+      return res.status(500).json({
+        error: message,
+      });
   }
 });
 

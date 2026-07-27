@@ -8,19 +8,16 @@ import path from "node:path";
 import prisma from "../lib/prisma.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
 import { tailorResume } from "../services/test-gemini.js";
-import { finalResume } from "../services/check-gemini.js"
+import { finalResume } from "../services/check-gemini.js";
 import { AiModelUnavailableError } from "../services/geminiRetry.js";
 import type { User } from "../../generated/prisma/client.js";
-
-
 
 const router = Router();
 
 // Python interpreter used for PDF generation. Defaults to the project venv
 // (backend/.venv), which is where reportlab is installed. Override with the
 // PYTHON_BIN env var in other environments.
-const PYTHON_BIN =
-  process.env.PYTHON_BIN ?? path.resolve(".venv/bin/python3");
+const PYTHON_BIN = process.env.PYTHON_BIN ?? path.resolve(".venv/bin/python3");
 
 // ---------------------------------------------------------------------------
 // Build jobs
@@ -86,6 +83,28 @@ function resolveGeneratorPath(templateId: string): string {
   }
 }
 
+async function generatePdf(content: unknown, templateId: string,): Promise<Uint8Array<ArrayBuffer>> {
+  const generatorPath = resolveGeneratorPath(templateId);
+  const outputPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`);
+
+  try {
+    const pythonProcess = spawn(PYTHON_BIN, [generatorPath, outputPath]);
+
+    pythonProcess.stdin.end(JSON.stringify(content));
+
+    const [exitCode] = (await once(pythonProcess, "close")) as [number];
+
+    if (exitCode !== 0) {
+      throw new Error("PDF generation failed.");
+    }
+
+    const fileBuffer = await readFile(outputPath);
+    return Uint8Array.from(fileBuffer);
+  } finally {
+    await unlink(outputPath).catch(() => undefined);
+  }
+}
+
 /**
  * Runs the full resume pipeline, invoking `emit` before each stage so the
  * caller can stream progress. Returns the id of the persisted resume.
@@ -114,19 +133,7 @@ async function runBuildPipeline(
   });
 
   emit("generating_pdf");
-  const gPath = resolveGeneratorPath(templateId);
-  const oPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`);
-
-  const pythonProcess = spawn(PYTHON_BIN, [gPath, oPath]);
-  pythonProcess.stdin.end(JSON.stringify(completeResume));
-
-  const [exitCode] = (await once(pythonProcess, "close")) as [number];
-  if (exitCode !== 0) {
-    throw new Error("PDF generation failed.");
-  }
-
-  const pdfData = await readFile(oPath);
-  await unlink(oPath);
+  const pdfData = await generatePdf(completeResume, templateId);
 
   // Title the resume after the job post. The AI emits `jobPostTitle` per the
   // schema; fall back to the posting hostname if it's missing/blank.
@@ -273,9 +280,7 @@ router.get(
     }
     const currentUser = req.user as User;
     if (currentUser.id !== userId) {
-      return res
-        .status(403)
-        .json({ error: "You cannot access this build." });
+      return res.status(403).json({ error: "You cannot access this build." });
     }
 
     const job = jobs.get(jobId);
@@ -358,42 +363,216 @@ router.get(
 // List the current user's previously-generated resumes (metadata only — the
 // pdf bytes are fetched per-resume via the /pdf endpoint below, e.g. for
 // thumbnails on the "My resumes" page).
+router.get("/:userId/resumes", async (req: Request, res: Response) => {
+  const { userId } = req.params;
+
+  if (!req.user) {
+    return res.status(401).json({ error: "Please log in." });
+  }
+  const currentUser = req.user as User;
+  if (currentUser.id !== userId) {
+    return res.status(403).json({ error: "You cannot access these resumes." });
+  }
+
+  try {
+    const resumes = await prisma.resume.findMany({
+      where: { userId: currentUser.id },
+      select: {
+        id: true,
+        title: true,
+        templateId: true,
+        URL: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" }
+    });
+
+    return res.status(200).json({ resumes });
+  } catch (error: unknown) {
+
+    const message = error instanceof Error ? error.message : "Unknown error";
+   
+    return res.status(500).json({error: "Unable to load your resumes right now.", detail: message});
+  }
+});
+
+// Retrieve one resume's editable JSON content.
 router.get(
-  "/:userId/resumes",
+  "/:userId/resumes/:resumeId/edit",
   async (req: Request, res: Response) => {
-    const { userId } = req.params;
+    const { userId, resumeId } = req.params;
+
+    if (typeof userId !== "string" || typeof resumeId !== "string") {
+      return res.status(400).json({error: "Invalid resume details."});
+    }
 
     if (!req.user) {
       return res.status(401).json({ error: "Please log in." });
     }
+
     const currentUser = req.user as User;
+
     if (currentUser.id !== userId) {
-      return res
-        .status(403)
-        .json({ error: "You cannot access these resumes." });
+      return res.status(403).json({error: "You cannot access this resume."});
     }
 
     try {
-      const resumes = await prisma.resume.findMany({
-        where: { userId: currentUser.id },
+      const resume = await prisma.resume.findFirst({
+        where: {
+          id: resumeId,
+          userId: currentUser.id,
+        },
         select: {
           id: true,
           title: true,
           templateId: true,
-          URL: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: "desc" },
+          content: true,
+        }
       });
 
-      return res.status(200).json({ resumes });
+      if (!resume) {
+        return res.status(404).json({error: "Resume not found."});
+      }
+
+      return res.status(200).json({ resume });
+    } catch (error: unknown) {
+
+      const message = error instanceof Error ? error.message : "Unknown error";
+
+      return res.status(500).json({error: "Unable to load this resume right now.", detail: message});
+    }
+  },
+);
+
+router.patch(
+  "/:userId/resumes/:resumeId",
+  async (req: Request, res: Response) => {
+    const { userId, resumeId } = req.params;
+
+    if (typeof userId !== "string" || typeof resumeId !== "string") {
+      return res.status(400).json({error: "Invalid resume details."});
+    }
+
+    if (!req.user) {
+      return res.status(401).json({error: "Please log in."});
+    }
+
+    const currentUser = req.user as User;
+
+    if (currentUser.id !== userId) {
+      return res.status(403).json({error: "You cannot edit this resume."});
+    }
+
+    const { content } = req.body;
+
+    if (!content || typeof content !== "object" || Array.isArray(content)) {
+      return res.status(400).json({error: "Valid resume content is required."});
+    }
+
+    try {
+      const existingResume = await prisma.resume.findFirst({
+        where: {
+          id: resumeId,
+          userId: currentUser.id,
+        },
+        select: {
+          id: true,
+        }
+      });
+
+      if(!existingResume) {
+        return res.status(404).json({error: "Resume not found."});
+      }
+
+      const updatedResume = await prisma.resume.update({
+        where: {
+          id: existingResume.id,
+        },
+        data: {
+          content,
+        },
+        select: {
+          id: true,
+          title: true,
+          templateId: true,
+          content: true,
+        }
+      });
+
+      return res.status(200).json({resume: updatedResume});
+    } catch (error: unknown) {
+
+      const message = error instanceof Error ? error.message : "Unknown error";
+
+      return res.status(500).json({error: "Unable to save this resume right now.", detail: message});
+    }
+  },
+);
+
+router.post(
+  "/:userId/resumes/:resumeId/regenerate",
+  async (req: Request, res: Response) => {
+    const { userId, resumeId } = req.params;
+
+    if (typeof userId !== "string" || typeof resumeId !== "string") {
+      return res.status(400).json({error: "Invalid resume details."});
+    }
+
+    if (!req.user) {
+      return res.status(401).json({error: "Please log in."});
+    }
+
+    const currentUser = req.user as User;
+
+    if (currentUser.id !== userId) {
+      return res.status(403).json({error: "You cannot regenerate this resume."});
+    }
+
+    try {
+      const resume = await prisma.resume.findFirst({
+        where: {
+          id: resumeId,
+          userId: currentUser.id,
+        },
+        select: {
+          id: true,
+          templateId: true,
+          URL: true,
+          content: true,
+        },
+      });
+
+      if (!resume) {
+        return res.status(404).json({error: "Resume not found."});
+      }
+
+      const pdfData = await generatePdf(resume.content, resume.templateId);
+      const content = resume.content as Record<string, unknown>;
+      const rawTitle = content.jobPostTitle;
+
+      const title = typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : hostnameOf(resume.URL);
+
+      const updatedResume = await prisma.resume.update({
+        where: {
+          id: resume.id,
+        },
+        data: {
+          title,
+          pdfData,
+        },
+        select: {
+          id: true,
+          title: true,
+          templateId: true,
+          updatedAt: true,
+        }
+      });
+
+      return res.status(200).json({resume: updatedResume});
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("[GET /:userId/resumes] Failed to list resumes:", error);
-      return res.status(500).json({
-        error: "Unable to load your resumes right now.",
-        detail: message,
-      });
+
+      return res.status(500).json({error: "Unable to regenerate this resume.", detail: message});
     }
   },
 );
@@ -403,6 +582,10 @@ router.get(
   async (req: Request, res: Response) => {
     const { userId, resumeId } = req.params;
     const currentUser = req.user as { id: string };
+
+    if (!req.user) {
+      return res.status(401).json({ error: "Please log in." });
+    }
 
     if (typeof userId !== "string" || typeof resumeId !== "string") {
       return res.status(400).json({ error: "Invalid resume details." });
@@ -425,14 +608,53 @@ router.get(
     });
 
     if (!resume?.pdfData) {
-      return res.status(404).json({error: "PDF not found.",});
+      return res.status(404).json({ error: "PDF not found." });
     }
 
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'inline; filename="resume.pdf"',
-    );
-
+    res.setHeader("Content-Disposition", 'inline; filename="resume.pdf"');
+    res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
     return res.send(Buffer.from(resume.pdfData));
+  },
+);
+
+router.delete(
+  "/:userId/resumes/:resumeId",
+  async (req: Request, res: Response) => {
+    const { userId, resumeId } = req.params;
+
+    if(typeof userId !== "string" || typeof resumeId !== "string") {
+      return res.status(400).json({error: "Invalid resume details."});
+    }
+
+    if (!req.user) {
+      return res.status(401).json({error: "Please log in."});
+    }
+
+    const currentUser = req.user as User;
+
+    if (currentUser.id !== userId) {
+      return res.status(403).json({error: "You cannot delete this resume."});
+    }
+
+    try {
+      const result = await prisma.resume.deleteMany({
+        where: {
+          id: resumeId,
+          userId: currentUser.id,
+        }
+      });
+
+      if (result.count === 0) {
+        return res.status(404).json({error: "Resume not found."});
+      }
+
+      return res.status(204).send();
+    } catch (error: unknown) {
+      return res.status(500).json({error: "Unable to delete this resume."});
+    }
   },
 );
 
