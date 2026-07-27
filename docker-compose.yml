@@ -1,0 +1,85 @@
+version: "3.7"
+
+services:
+  nginx-proxy:
+    image: jwilder/nginx-proxy
+    container_name: nginx-proxy
+    labels:
+      - "com.github.nginx-proxy.nginx"
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock:ro
+      - ./certs:/etc/nginx/certs
+      - ./vhost:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+
+  nginx-proxy-acme:
+    image: nginxproxy/acme-companion
+    container_name: nginx-proxy-acme
+    depends_on:
+      - nginx-proxy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./certs:/etc/nginx/certs
+      - ./vhost:/etc/nginx/vhost.d
+      - ./html:/usr/share/nginx/html
+      - ./acme:/etc/acme.sh
+    environment:
+      - DEFAULT_EMAIL=${LETSENCRYPT_EMAIL}
+
+  db:
+    image: postgres:17
+    container_name: db
+    restart: always
+    environment:
+      - POSTGRES_DB=resumebuilder
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder
+    container_name: backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    expose:
+      - 3000
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/resumebuilder
+      - SECRETKEY=${SECRETKEY}
+      - FRONTEND_URL=${FRONTEND_URL}
+      - BACKEND_URL=${BACKEND_URL}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+      - STRIPE_PRICE_ID=${STRIPE_PRICE_ID}
+      - APIKEY_1=${APIKEY_1}
+      - APIKEY_2=${APIKEY_2}
+      - APIKEY_3=${APIKEY_3}
+
+  frontend:
+    image: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder
+    container_name: frontend
+    restart: always
+    depends_on:
+      - backend
+    expose:
+      - 80
+    environment:
+      - VIRTUAL_HOST=resumebuilder.works
+      - LETSENCRYPT_HOST=resumebuilder.works
+
+volumes:
+  pgdata:

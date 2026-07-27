@@ -49,7 +49,7 @@ import { ProfileWizardComponent } from './profile-wizard.component';
           <span class="count">{{ section.instances.length }}</span>
         </button>
 
-        <hr class="nav-divider" />
+        
 
         <button class="nav-item add-section" *ngIf="!showAddSectionForm()" (click)="openAddSectionModal()">
           <i class="ti ti-plus"></i> Add section
@@ -71,10 +71,32 @@ import { ProfileWizardComponent } from './profile-wizard.component';
 
         <hr class="nav-divider" />
 
+        <button
+          type="button"
+          class="nav-item add-section"
+          (click)="resumeFileInput.click()"
+          [disabled]="isImporting"
+        >
+          <i class="ti ti-upload"></i>
+          {{ isImporting ? 'Importing…' : 'Import resume' }}
+        </button>
+
+        <input
+          #resumeFileInput
+          type="file"
+          accept=".pdf,application/pdf"
+          hidden
+          (change)="onResumeSelected($event)"
+        />
+
+        <hr class="nav-divider" />
+
         <button class="nav-item" (click)="startWizard()">
           <i class="ti ti-wand"></i> Guided setup
         </button>
       </nav>
+
+
 
       <!-- Main content -->
       <div class="profile-main">
@@ -220,6 +242,43 @@ export class ProfileSetupComponent implements OnInit {
     // Service updates local order optimistically; reload to roll back on failure.
     this.profileService.moveSection(event.previousIndex, event.currentIndex).subscribe({
       error: () => this.profileService.loadProfile().subscribe(),
+    });
+  }
+
+  isImporting = false;
+
+  onResumeSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      alert('Please select a PDF file.');
+      input.value = '';
+      return;
+    }
+
+    this.isImporting = true;
+
+    this.profileService.importResume(file).subscribe({
+      next: ({ profile }) => {
+        console.log('Imported profile:', profile);
+
+        this.isImporting = false;
+        input.value = '';
+
+        window.location.reload();
+      },
+      error: (error) => {
+        console.error('Resume import failed:', error);
+        alert('The resume could not be imported.');
+
+        this.isImporting = false;
+        input.value = '';
+      }
     });
   }
 

@@ -1,0 +1,363 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "headline": {
+          "type": ["string", "null"]
+        },
+        "phone": {
+          "type": ["string", "null"]
+        },
+        "location": {
+          "type": ["string", "null"]
+        },
+        "summary": {
+          "type": ["string", "null"]
+        },
+        "linkedin": {
+          "type": ["string", "null"]
+        },
+        "github": {
+          "type": ["string", "null"]
+        },
+        "portfolio": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": [
+        "headline",
+        "phone",
+        "location",
+        "summary",
+        "linkedin",
+        "github",
+        "portfolio"
+      ]
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "WORK_EXPERIENCE",
+              "EDUCATION",
+              "SKILLS",
+              "PROJECTS",
+              "CERTIFICATIONS",
+              "AWARDS",
+              "LANGUAGES",
+              "VOLUNTEER"
+            ]
+          },
+          "label": {
+            "type": "string"
+          },
+          "instances": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+"data": {
+  "description": "Use the data shape that matches the parent section's type.",
+  "anyOf": [
+    {
+      "title": "WORK_EXPERIENCE data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "company": {
+          "type": "string",
+          "description": "Exact employer or company name."
+        },
+        "title": {
+          "type": "string",
+          "description": "Exact job title."
+        },
+        "location": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Full role summary, responsibilities, and outcomes."
+        },
+        "technologies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tools, technologies, and methods used."
+        },
+        "startDate": {
+          "type": "string",
+          "description": "Start date, preferably formatted as YYYY-MM."
+        },
+        "endDate": {
+          "type": "string",
+          "description": "End date, preferably formatted as YYYY-MM."
+        },
+        "current": {
+          "type": "boolean",
+          "description": "True only when the person currently works here."
+        },
+        "bullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every distinct responsibility, achievement, and result."
+        },
+        "customDetails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["label", "value"]
+          }
+        }
+      },
+      "required": [
+        "company",
+        "title",
+        "startDate",
+        "current",
+        "bullets"
+      ]
+    },
+    {
+      "title": "EDUCATION data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "school": {
+          "type": "string",
+          "description": "Exact school or institution name."
+        },
+        "degree": {
+          "type": "string",
+          "description": "Exact degree or credential."
+        },
+        "field": {
+          "type": "string",
+          "description": "Field or program of study."
+        },
+        "gpa": {
+          "type": "string"
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "bullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Academic distinctions, coursework, and relevant details."
+        }
+      },
+      "required": ["school", "degree", "bullets"]
+    },
+    {
+      "title": "SKILLS data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "Skill category, such as Languages, Frameworks, or Tools."
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every individual skill in this category."
+        }
+      },
+      "required": ["category", "skills"]
+    },
+    {
+      "title": "PROJECTS data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Exact project name."
+        },
+        "url": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string",
+          "description": "Complete explanation of what the project does and why it matters."
+        },
+        "technologies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Tools, languages, frameworks, and platforms used."
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean",
+          "description": "True only when the project is ongoing."
+        },
+        "bullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every project contribution, feature, and measured result."
+        },
+        "customDetails": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": ["label", "value"]
+          }
+        }
+      },
+      "required": ["name", "current", "bullets"]
+    },
+    {
+      "title": "CERTIFICATIONS data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Exact certification name."
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string",
+          "description": "Credential URL."
+        }
+      },
+      "required": ["name"]
+    },
+    {
+      "title": "AWARDS data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Exact contest, award, honour, scholarship, or distinction name. Never combine separately named contests."
+        },
+        "issuer": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "description": "Only the year or date of the award."
+        },
+        "description": {
+          "type": "string",
+          "description": "Exact score, rank, placement, result, or distinction. Do not put the year here. Use an empty string only when no result is provided."
+        }
+      },
+      "required": ["title", "description"]
+    },
+    {
+      "title": "LANGUAGES data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Language name."
+        },
+        "proficiency": {
+          "type": "string",
+          "description": "Language proficiency when stated."
+        }
+      },
+      "required": ["language"]
+    },
+    {
+      "title": "VOLUNTEER data",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "organization": {
+          "type": "string",
+          "description": "Exact nonprofit, community organization, charity, or event name."
+        },
+        "role": {
+          "type": "string",
+          "description": "Volunteer role or activity name."
+        },
+        "startDate": {
+          "type": "string"
+        },
+        "endDate": {
+          "type": "string"
+        },
+        "current": {
+          "type": "boolean",
+          "description": "True only when the volunteer activity is ongoing."
+        },
+        "bullets": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Every volunteer duty, contribution, and impact statement. Descriptive text belongs here, not in a description property."
+        }
+      },
+      "required": ["organization", "current", "bullets"]
+    }
+  ]
+}
+              },
+              "required": ["data"]
+            }
+          }
+        },
+        "required": ["type", "label", "instances"]
+      }
+    }
+  },
+  "required": ["profile", "sections"]
+}

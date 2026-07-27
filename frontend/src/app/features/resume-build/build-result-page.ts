@@ -11,20 +11,47 @@ import { ResumeBuildService } from './resume-build.service';
   standalone: true,
   imports: [CommonModule, RouterLink],
   template: `
-    <section class="result-page" *ngIf="pdfUrl(); else missing">
+    <section class="result-page" *ngIf="pdfURL(); else missing">
       <header class="result-header">
         <div>
           <p class="eyebrow">Your tailored resume</p>
           <h2 class="title">Ready to download</h2>
         </div>
-        <div class="actions">
-          <a class="primary-action" [href]="pdfUrl()" download="resume.pdf">Download PDF</a>
-          <a class="secondary-action" routerLink="/tailor">Build another</a>
-        </div>
+          <div class="actions">
+            <a
+              *ngIf="resumeId() as id"
+              class="primary-action"
+              [routerLink]="['/my-resumes', id, 'edit']"
+            >
+              ✎ Edit resume
+            </a>
+
+            <a
+              class="tertiary-action"
+              routerLink="/my-resumes"
+            >
+              See my resumes
+            </a>
+            
+            <a
+              class="secondary-action"
+              [href]="pdfURL()"
+              download="resume.pdf"
+            >
+              Download PDF
+            </a>
+
+            <a
+              class="secondary-action"
+              routerLink="/tailor"
+            >
+              Build another
+            </a>
+          </div>
       </header>
 
       <div class="preview">
-        <iframe [src]="safePdfUrl()" title="Generated resume preview"></iframe>
+        <iframe [src]="safepdfURL()" title="Generated resume preview"></iframe>
       </div>
     </section>
 
@@ -71,6 +98,7 @@ import { ResumeBuildService } from './resume-build.service';
         color: var(--ink);
       }
       .actions {
+        flex-wrap: wrap;
         display: flex;
         gap: 0.75rem;
       }
@@ -105,6 +133,29 @@ import { ResumeBuildService } from './resume-build.service';
       .secondary-action:hover {
         background: rgba(255, 255, 255, 0.12);
       }
+      .tertiary-action {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.65rem 1.3rem;
+        border: 1px solid #4f8cff;
+        border-radius: 0.7rem;
+
+        color: #ffffffff;
+        background: rgba(140, 0, 255, 1);
+        text-decoration: none;
+        font-size: 0.9rem;
+        font-weight: 600;
+
+        transition:
+          transform 0.16s ease,
+          background 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+      .tertiary-action:hover {
+        transform: translateY(-1px);
+        background: rgba(140, 0, 255, 1);
+        box-shadow: 0 12px 28px -16px rgba(122, 97, 255, 0.85);
+      }
       .preview {
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 1rem;
@@ -135,19 +186,24 @@ export class BuildResultPage implements OnInit {
   private readonly resumeBuild = inject(ResumeBuildService);
   private readonly sanitizer = inject(DomSanitizer);
 
-  readonly pdfUrl = signal<string | null>(null);
-  readonly safePdfUrl = signal<SafeResourceUrl | null>(null);
+  readonly resumeId = signal<string | null>(null);
+  readonly pdfURL = signal<string | null>(null);
+  readonly safepdfURL = signal<SafeResourceUrl | null>(null);
 
   ngOnInit(): void {
-    const jobId = this.route.snapshot.paramMap.get('jobId');
+    const resumeId = this.route.snapshot.paramMap.get('jobId');
+
     const userId = this.auth.user()?.id;
 
-    if (!jobId || !userId) {
+    if(!resumeId || !userId){
       return;
     }
 
-    const url = this.resumeBuild.pdfUrl(userId, jobId);
-    this.pdfUrl.set(url);
-    this.safePdfUrl.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+    this.resumeId.set(resumeId);
+
+    const url = this.resumeBuild.pdfUrl(userId, resumeId);
+
+    this.pdfURL.set(url);
+    this.safepdfURL.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
   }
 }

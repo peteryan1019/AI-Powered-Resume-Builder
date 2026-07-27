@@ -39,30 +39,58 @@ interface ResumeCard extends ResumeSummary {
       </div>
 
       <div class="grid" *ngIf="cards().length > 0">
-        <a
-          class="card"
-          *ngFor="let card of cards()"
-          [href]="card.openUrl"
-          target="_blank"
-          rel="noopener"
-        >
-          <div class="thumb">
-            <!-- Zoomed-out first-page preview. pointer-events are disabled so the
-                 whole card stays clickable and the pdf toolbar/scroll is inert. -->
-            <iframe
-              [src]="card.thumbUrl"
-              title="Resume preview"
-              tabindex="-1"
-              scrolling="no"
-            ></iframe>
-            <span class="thumb-overlay">Open</span>
-          </div>
-          <div class="card-meta">
-            <strong class="card-title" [title]="card.displayTitle">{{ card.displayTitle }}</strong>
-            <span class="card-host">{{ card.templateId | titlecase }} · {{ card.hostname }}</span>
-            <span class="card-date">{{ card.createdAt | date: 'mediumDate' }}</span>
-          </div>
-        </a>
+        <article class="card" *ngFor="let card of cards()">
+          <a
+            class="card-open"
+            [href]="card.openUrl"
+            target="_blank"
+            rel="noopener"
+          >
+            <div class="thumb">
+              <iframe
+                [src]="card.thumbUrl"
+                title="Resume preview"
+                tabindex="-1"
+                scrolling="no"
+              ></iframe>
+
+              <span class="thumb-overlay">Open</span>
+            </div>
+
+            <div class="card-meta">
+              <strong class="card-title" [title]="card.displayTitle">
+                {{ card.displayTitle }}
+              </strong>
+
+              <span class="card-host">
+                {{ card.templateId | titlecase }} · {{ card.hostname }}
+              </span>
+
+              <span class="card-date">
+                {{ card.createdAt | date: 'mediumDate' }}
+              </span>
+            </div>
+          </a>
+
+          <a
+            class="edit-action"
+            [routerLink]="[card.id, 'edit']"
+            [attr.aria-label]="'Edit ' + card.displayTitle"
+            title="Edit resume"
+          >
+            <span aria-hidden="true">✎</span>
+          </a>
+
+         <button
+           type="button"
+           class="delete-action"
+           [attr.aria-label]="'Delete ' + card.displayTitle"
+           title="Delete resume"
+           (click)="deleteResume(card)"
+         >
+          <span aria-hidden="true">🗑</span>
+         </button>
+        </article>
       </div>
     </section>
   `,
@@ -152,6 +180,7 @@ interface ResumeCard extends ResumeSummary {
       }
 
       .card {
+        position: relative;
         display: flex;
         flex-direction: column;
         text-decoration: none;
@@ -164,6 +193,13 @@ interface ResumeCard extends ResumeSummary {
           transform 0.16s ease,
           box-shadow 0.16s ease,
           border-color 0.16s ease;
+      }
+      .card-open {
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        color: inherit;
+        text-decoration: none;
       }
       .card:hover {
         transform: translateY(-3px);
@@ -206,7 +242,7 @@ interface ResumeCard extends ResumeSummary {
         display: flex;
         flex-direction: column;
         gap: 0.15rem;
-        padding: 0.85rem 1rem;
+        padding: 0.85rem 6.5rem 0.85rem 1rem;
       }
       .card-title {
         font-size: 0.98rem;
@@ -218,6 +254,66 @@ interface ResumeCard extends ResumeSummary {
       .card-date {
         font-size: 0.78rem;
         color: rgba(244, 246, 255, 0.55);
+      }
+      .edit-action {
+        position: absolute;
+        right: 0.8rem;
+        bottom: 0.8rem;
+        z-index: 2;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        width: 2.25rem;
+        height: 2.25rem;
+        border: 1px solid rgba(122, 97, 255, 0.55);
+        border-radius: 50%;
+
+        color: #fff;
+        background: linear-gradient(135deg, #7a61ff, #4285f4);
+        text-decoration: none;
+        font-size: 1.2rem;
+
+        transition:
+          transform 0.16s ease,
+          box-shadow 0.16s ease;
+      }
+
+      .edit-action:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px -8px rgba(66, 133, 244, 0.9);
+      }
+
+      .delete-action {
+        position: absolute;
+        right: 3.55rem;
+        bottom: 0.8rem;
+        z-index: 2;
+
+        display: flex;
+        align-items: center;
+        justify-content: center;
+
+        width: 2.25rem;
+        height: 2.25rem;
+        padding: 0;
+        border: 1px solid rgba(255, 105, 105, 0.6);
+        border-radius: 50%;
+
+        color: #fff;
+        background: rgba(190, 50, 65, 0.85);
+        font: inherit;
+        cursor: pointer;
+
+        transition:
+          transform 0.16s ease,
+          background 0.16s ease;
+      }
+
+      .delete-action:hover {
+        transform: translateY(-2px);
+        background: #d44758;
       }
     `,
   ],
@@ -267,6 +363,27 @@ export class MyResumesPage implements OnInit {
           error?.error?.error ?? 'Unable to load your resumes right now.',
         );
       },
+    });
+  }
+
+  deleteResume(card: ResumeCard): void {
+    const userId = this.auth.user()?.id;
+
+    if (!userId) {this.errorMessage.set('Please sign in to delete a resume.');
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete "${card.displayTitle}"? This action cannot be undone.`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.resumeService.deleteResume(userId, card.id).subscribe({next: () => 
+      {
+        this.resumes.update((resumes) => resumes.filter((resume) => resume.id !== card.id));
+      },
+      error: (error) => {this.errorMessage.set(error?.error?.error ??'Unable to delete this resume.');}
     });
   }
 
