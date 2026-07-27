@@ -21,7 +21,7 @@ export class ResumeBuildService {
   // EventSource, which is same-origin unless it hits the backend directly; using
   // the absolute origin + withCredentials ensures the backend session cookie is
   // sent (the global CORS config allows localhost:4200 with credentials).
-  private readonly apiUrl = 'http://localhost:3000/api';
+  private readonly apiUrl = '/api';
 
   /** Registers a build job and returns the jobId to stream progress against. */
   startBuild(
