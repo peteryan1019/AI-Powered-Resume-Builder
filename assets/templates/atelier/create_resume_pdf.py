@@ -1,0 +1,673 @@
+# -*- coding: utf-8 -*-
+"""Generate a one-page resume PDF in the "atelier" style.
+
+Consumes exactly the same JSON structure as the signal and evergreen templates
+(see assets/templates/schema.json), so the AI layer and the backend need no
+per-template branching — only the presentation differs.
+
+Atelier is the editorial layout: a two-axis grid where each section's label sits
+in a left rail, right-aligned against the content column and sharing the
+baseline of that section's first line, rather than stacked above it. Wide
+margins, an oxblood accent, letterspaced small-caps labels and a middot bullet
+give the page a magazine feel. Placing the label beside the content also buys
+back the vertical space a stacked heading would cost, which is what lets the
+narrower content column still hold a full resume on one page.
+
+Fonts come from the shared assets/fonts directory (Carlito, the metric-compatible
+Calibri clone), falling back to Helvetica so the script never hard-fails.
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from typing import Dict, List, Optional, Tuple
+
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.pdfmetrics import getAscentDescent, registerFontFamily, stringWidth
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen.canvas import Canvas
+
+PAGE_W, PAGE_H = letter  # 612 x 792 pt
+
+# -----------------------------------------------------------------------------
+# Geometry (points) — the two-axis editorial grid
+# -----------------------------------------------------------------------------
+LEFT = 40.0
+RIGHT = 44.0
+RIGHT_EDGE = PAGE_W - RIGHT        # 568
+RAIL_W = 92.0                      # left rail holding section labels
+GUTTER = 16.0
+COL_X = LEFT + RAIL_W + GUTTER     # 148 — the content axis
+COL_W = RIGHT_EDGE - COL_X         # 420
+RAIL_END = COL_X - GUTTER          # 132 — labels are right-aligned to here
+
+BULLET_X = COL_X                   # middot glyph x
+BULLET_TEXT_X = COL_X + 10.0       # text / hanging indent
+BULLET_MAX_W = RIGHT_EDGE - BULLET_TEXT_X
+
+DATE_GUTTER = 12.0
+
+START_BASELINE = 742.0
+
+# Vertical rhythm. Rigid gaps hold the design's proportions; flexible gaps
+# stretch to fill a short page.
+LINE = 12.20                # single line advance                  (rigid)
+NAME_TO_CONTACT = 15.00     # name -> contact line                 (rigid)
+CONTACT_TO_RULE = 10.00     # contact baseline -> header rule      (rigid)
+RULE_GAP = 2.6              # spacing between the two header rules
+SECTION_GAP_FIRST = 26.00   # header rule -> first section         (flexible)
+SECTION_GAP = 21.00         # previous content -> next section     (flexible)
+ENTRY_SPACE = 8.50          # space before each entry block        (flexible)
+SUBLINE_GAP = 11.80         # heading -> role/meta line            (rigid)
+
+MIN_MARGIN = 34.0
+GAP_SCALE_MAX = 1.9
+GAP_FILL_FRACTION = 0.5
+# A narrower content column wraps more, so this ladder reaches further down
+# than signal's or evergreen's.
+FONT_SCALES = (1.0, 0.97, 0.94, 0.91, 0.88, 0.85, 0.82, 0.79, 0.76)
+
+# Font sizes
+NAME_SIZE = 20.0
+LABEL_SIZE = 8.4            # rail section labels
+BODY_SIZE = 10.0
+CONTACT_SIZE = 9.2
+
+# Letterspacing (tracking) at scale 1.0
+NAME_TRACK = 1.5
+LABEL_TRACK = 1.1
+CONTACT_TRACK = 0.35
+
+# Colors
+INK = (0.114, 0.110, 0.106)        # #1D1C1B warm near-black
+ACCENT = (0.400, 0.129, 0.161)     # #66212A oxblood
+MUTED = (0.435, 0.427, 0.416)      # #6F6D6A meta / dates
+HAIRLINE = (0.816, 0.804, 0.788)   # #D0CDC9 rules
+LINK = (0.361, 0.216, 0.196)       # #5C3732 links, tinted warm
+
+SEP_CONTACT = "   "                # contact parts separated by space + middot
+CONTACT_DOT = "·"
+SEP_ROLE = "  ·  "
+BULLET_GLYPH = "·"
+
+# -----------------------------------------------------------------------------
+# Fonts
+# -----------------------------------------------------------------------------
+_FONT_DIR = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "fonts")
+)
+
+
+def _register_fonts() -> Tuple[str, str, str, str]:
+    faces = {
+        "Calibri": "Carlito-Regular.ttf",
+        "Calibri-Bold": "Carlito-Bold.ttf",
+        "Calibri-Italic": "Carlito-Italic.ttf",
+        "Calibri-BoldItalic": "Carlito-BoldItalic.ttf",
+    }
+    try:
+        for name, filename in faces.items():
+            pdfmetrics.registerFont(TTFont(name, os.path.join(_FONT_DIR, filename)))
+        registerFontFamily(
+            "Calibri", normal="Calibri", bold="Calibri-Bold",
+            italic="Calibri-Italic", boldItalic="Calibri-BoldItalic",
+        )
+        return "Calibri", "Calibri-Bold", "Calibri-Italic", "Calibri-BoldItalic"
+    except Exception:
+        return ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique",
+                "Helvetica-BoldOblique")
+
+
+FONT, FONT_BOLD, FONT_ITALIC, FONT_BOLDIT = _register_fonts()
+
+
+# -----------------------------------------------------------------------------
+# Input normalisation
+#
+# The JSON schema guarantees only that keys are PRESENT, never that they carry
+# content: a section may legitimately arrive with `bullets: []` because the user
+# has no such credential, and every required string may be "". Pruning before
+# any layout pass keeps empty parts from costing ink or vertical space, and
+# keeps the measure and draw passes in agreement.
+# -----------------------------------------------------------------------------
+def _s(value) -> str:
+    return value.strip() if isinstance(value, str) else ""
+
+
+def _clean_bullet(bullet: dict) -> Optional[dict]:
+    label, text, url = _s(bullet.get("label")), _s(bullet.get("text")), _s(bullet.get("url"))
+    if not (label or text or url):
+        return None
+    cleaned = {"id": bullet.get("id", "")}
+    if label:
+        cleaned["label"] = label
+    if text:
+        cleaned["text"] = text
+    if url:
+        cleaned["url"] = url
+    return cleaned
+
+
+def _clean_bullets(bullets) -> List[dict]:
+    return [b for b in (_clean_bullet(x) for x in (bullets or [])) if b]
+
+
+def prune_resume_data(data: dict) -> dict:
+    """Strip blank strings and empty containers. Content is never discarded:
+    a block survives if any of its parts survive."""
+    header = data.get("header") or {}
+    contact = header.get("contact") or {}
+    pruned_header = {
+        "name": {
+            "id": (header.get("name") or {}).get("id", ""),
+            "text": _s((header.get("name") or {}).get("text")),
+        },
+        "contact": {
+            "id": contact.get("id", ""),
+            "parts": [p for p in (contact.get("parts") or []) if _s(p.get("text"))],
+        },
+    }
+
+    sections: List[dict] = []
+    for section in data.get("sections") or []:
+        kind = section.get("type")
+        base = {
+            "id": section.get("id", ""),
+            "title": _s(section.get("title")),
+            "type": kind,
+        }
+
+        if kind == "bullets":
+            bullets = _clean_bullets(section.get("bullets"))
+            if bullets:
+                sections.append({**base, "bullets": bullets})
+
+        elif kind == "entries":
+            entries = []
+            for entry in section.get("entries") or []:
+                bullets = _clean_bullets(entry.get("bullets"))
+                heading, meta, date = (
+                    _s(entry.get("heading")), _s(entry.get("meta")), _s(entry.get("date")),
+                )
+                if heading or meta or date or bullets:
+                    entries.append({
+                        "id": entry.get("id", ""), "heading": heading,
+                        "meta": meta, "date": date, "bullets": bullets,
+                    })
+            if entries:
+                sections.append({**base, "entries": entries})
+
+        elif kind == "org_entries":
+            entries = []
+            for entry in section.get("entries") or []:
+                bullets = _clean_bullets(entry.get("bullets"))
+                org, role, location, date = (
+                    _s(entry.get("org")), _s(entry.get("role")),
+                    _s(entry.get("location")), _s(entry.get("date")),
+                )
+                if org or role or location or date or bullets:
+                    entries.append({
+                        "id": entry.get("id", ""), "org": org, "role": role,
+                        "location": location, "date": date, "bullets": bullets,
+                    })
+            if entries:
+                sections.append({**base, "entries": entries})
+
+        elif kind == "education":
+            school = section.get("school") or {}
+            school_text = _s(school.get("text"))
+            bullets = _clean_bullets(section.get("bullets"))
+            if school_text or bullets:
+                sections.append({
+                    **base,
+                    "school": {"id": school.get("id", ""), "text": school_text},
+                    "bullets": bullets,
+                })
+
+        # An unrecognised section type has no renderer, so it is dropped.
+
+    return {**data, "header": pruned_header, "sections": sections}
+
+
+def apply_text_updates(data: dict, updates_by_id: Dict[str, str]) -> dict:
+    """Mutate text/label fields whose id exists in updates_by_id."""
+    def walk(obj):
+        if isinstance(obj, dict):
+            if obj.get("id") in updates_by_id:
+                if "text" in obj:
+                    obj["text"] = updates_by_id[obj["id"]]
+                elif "label" in obj:
+                    obj["label"] = updates_by_id[obj["id"]]
+            for v in obj.values():
+                walk(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                walk(item)
+    walk(data)
+    return data
+
+
+# -----------------------------------------------------------------------------
+# Renderer
+# -----------------------------------------------------------------------------
+def _tracked_width(text: str, font: str, size: float, tracking: float) -> float:
+    return stringWidth(text, font, size) + tracking * max(0, len(text) - 1)
+
+
+class ResumePDF:
+    def __init__(self, output_path: Optional[str], font_scale: float = 1.0,
+                 gap_scale: float = 1.0, start_baseline: float = START_BASELINE,
+                 measure: bool = False):
+        self.output_path = output_path
+        self.font_scale = font_scale
+        self.gap_scale = gap_scale
+        self.measure = measure
+        self.body = BODY_SIZE * font_scale
+        self.label_sz = LABEL_SIZE * font_scale
+        self.name_sz = NAME_SIZE * font_scale
+        self.contact_sz = CONTACT_SIZE * font_scale
+        self.line = LINE * font_scale
+        self.c = None if measure else Canvas(output_path, pagesize=letter)
+        self.y = start_baseline
+        self.elements: Dict[str, Tuple[float, float, float, float]] = {}
+
+    def _rigid(self, v: float) -> float:
+        return v * self.font_scale
+
+    def _flex(self, v: float) -> float:
+        return v * self.font_scale * self.gap_scale
+
+    # -- low-level drawing ----------------------------------------------------
+    def _text(self, x, y, text, font, size, color=INK):
+        if self.measure:
+            return
+        self.c.setFont(font, size)
+        self.c.setFillColorRGB(*color)
+        self.c.drawString(x, y, text)
+
+    def _tracked(self, x, y, text, font, size, color, tracking):
+        if self.measure:
+            return
+        self.c.setFont(font, size)
+        self.c.setFillColorRGB(*color)
+        cx = x
+        for ch in text:
+            self.c.drawString(cx, y, ch)
+            cx += stringWidth(ch, font, size) + tracking
+
+    def _right(self, y, text, font, size, color=MUTED):
+        if self.measure or not text:
+            return
+        self._text(RIGHT_EDGE - stringWidth(text, font, size), y, text, font, size, color)
+
+    def _rule(self, x0, y, x1, color=HAIRLINE, width=0.6):
+        if self.measure:
+            return
+        self.c.setStrokeColorRGB(*color)
+        self.c.setLineWidth(width)
+        self.c.line(x0, y, x1, y)
+
+    def _underline(self, x, baseline, width):
+        self.c.setStrokeColorRGB(*LINK)
+        self.c.setLineWidth(0.5)
+        self.c.line(x, baseline - 1.4, x + width, baseline - 1.4)
+
+    def _link(self, href, x, baseline, width, size):
+        self.c.linkURL(href, (x, baseline - 2, x + width, baseline + size * 0.78),
+                       relative=0, thickness=0)
+
+    def _inline(self, x, baseline, runs, box_id=None):
+        if self.measure or not runs:
+            return
+        cx = x
+        for r in runs:
+            w = stringWidth(r["text"], r["font"], r["size"])
+            self._text(cx, baseline, r["text"], r["font"], r["size"], r.get("color", INK))
+            if r.get("href"):
+                self._underline(cx, baseline, w)
+                self._link(r["href"], cx, baseline, w, r["size"])
+            cx += w
+        if box_id:
+            self.elements[box_id] = (x, baseline, cx - x, runs[0]["size"] * 1.2)
+
+    def _joined(self, parts, sep, size) -> List[dict]:
+        """Runs for one line, separating only non-blank parts so a missing value
+        never leaves a dangling separator."""
+        runs: List[dict] = []
+        for text, font, color in parts:
+            if not text:
+                continue
+            if runs:
+                runs.append({"text": sep, "font": FONT, "size": size, "color": HAIRLINE})
+            runs.append({"text": text, "font": font, "size": size, "color": color})
+        return runs
+
+    # -- wrapping -------------------------------------------------------------
+    def _wrap(self, tokens, max_w) -> List[List[dict]]:
+        size = self.body
+        lines: List[List[dict]] = [[]]
+        cur_w = 0.0
+        for t in tokens:
+            tw = stringWidth(t["text"], t["font"], size)
+            if lines[-1]:
+                sp = stringWidth(" ", t["font"], size)
+                if cur_w + sp + tw > max_w:
+                    lines.append([t])
+                    cur_w = tw
+                    continue
+                cur_w += sp + tw
+                lines[-1].append(t)
+            else:
+                lines[-1].append(t)
+                cur_w = tw
+        return lines
+
+    def _draw_lines(self, lines, x, size):
+        for li, line in enumerate(lines):
+            by = self.y - li * self.line
+            cx = x
+            for idx, t in enumerate(line):
+                if idx > 0:
+                    cx += stringWidth(" ", t["font"], size)
+                self._text(cx, by, t["text"], t["font"], size, t["color"])
+                tw = stringWidth(t["text"], t["font"], size)
+                if t.get("href"):
+                    self._underline(cx, by, tw)
+                    self._link(t["href"], cx, by, tw, size)
+                cx += tw
+
+    # -- blocks ---------------------------------------------------------------
+    def _rail_label(self, section_id, title):
+        """Draw the section label in the left rail, right-aligned to RAIL_END and
+        sharing the current baseline with the section's first content line.
+        Wraps onto extra rail lines when the label is wider than the rail."""
+        if self.measure or not title:
+            return
+        track = LABEL_TRACK * self.font_scale
+        words = title.split()
+        lines: List[str] = []
+        cur = ""
+        for w in words:
+            trial = f"{cur} {w}".strip()
+            if cur and _tracked_width(trial, FONT_BOLD, self.label_sz, track) > RAIL_W:
+                lines.append(cur)
+                cur = w
+            else:
+                cur = trial
+        if cur:
+            lines.append(cur)
+
+        for i, text in enumerate(lines):
+            w = _tracked_width(text, FONT_BOLD, self.label_sz, track)
+            # `track` adds a trailing gap after the last glyph; discount it so the
+            # optical right edge lands on RAIL_END.
+            self._tracked(RAIL_END - w, self.y - i * (self.label_sz * 1.25),
+                          text, FONT_BOLD, self.label_sz, ACCENT, track)
+        self.elements[section_id] = (LEFT, self.y, RAIL_W, self.label_sz)
+
+    def _bullet_tokens(self, b) -> List[dict]:
+        """label / text / url are independent; a bullet may carry any combination."""
+        toks: List[dict] = []
+        for w in _s(b.get("label")).split():
+            toks.append({"text": w, "font": FONT_BOLD, "color": INK})
+        for w in _s(b.get("text")).split():
+            toks.append({"text": w, "font": FONT, "color": INK})
+        url = _s(b.get("url"))
+        if url:
+            toks.append({"text": url, "font": FONT, "color": LINK, "href": url})
+        return toks
+
+    def _bullet(self, bullet_id, tokens) -> bool:
+        if not tokens:
+            return False
+        lines = self._wrap(tokens, BULLET_MAX_W)
+        top_y = self.y
+        if not self.measure:
+            self._text(BULLET_X, self.y, BULLET_GLYPH, FONT, self.body, ACCENT)
+            self._draw_lines(lines, BULLET_TEXT_X, self.body)
+        self.y -= (len(lines) - 1) * self.line
+        if not self.measure:
+            self.elements[bullet_id] = (
+                BULLET_TEXT_X, self.y, BULLET_MAX_W, top_y - self.y + self.body,
+            )
+        return True
+
+    def _title_with_date(self, box_id, title, title_font, date) -> bool:
+        """Left title (wrapped if needed) with the date right-aligned on the first
+        line. The heading wraps rather than colliding with the date."""
+        title, date = _s(title), _s(date)
+        if not (title or date):
+            return False
+
+        date_w = stringWidth(date, FONT, self.body) if date else 0.0
+        avail = COL_W - (date_w + DATE_GUTTER if date else 0.0)
+
+        if title:
+            toks = [{"text": w, "font": title_font, "color": INK} for w in title.split()]
+            lines = self._wrap(toks, max(avail, 60.0))
+            if not self.measure:
+                self._draw_lines(lines, COL_X, self.body)
+                self.elements[box_id] = (COL_X, self.y, COL_W, self.body)
+        else:
+            lines = [[]]
+
+        if date and not self.measure:
+            self._right(self.y, date, FONT, self.body, MUTED)
+
+        self.y -= (len(lines) - 1) * self.line
+        return True
+
+    # -- document -------------------------------------------------------------
+    def build(self, data: dict) -> Dict[str, object]:
+        header = data.get("header") or {}
+        name = header.get("name") or {}
+        name_text = _s(name.get("text"))
+        if not self.measure:
+            self.c.setTitle(f"{name_text} Resume".strip())
+
+        drawn = bool(name_text)
+        if drawn:
+            self._tracked(LEFT, self.y, name_text, FONT_BOLD, self.name_sz, INK,
+                          NAME_TRACK * self.font_scale)
+            self.elements[name.get("id", "")] = (LEFT, self.y, RIGHT_EDGE - LEFT, self.name_sz)
+
+        contact = header.get("contact") or {}
+        runs = []
+        for part in contact.get("parts") or []:
+            text = _s(part.get("text"))
+            if not text:
+                continue
+            if runs:
+                runs.append({"text": SEP_CONTACT, "font": FONT,
+                             "size": self.contact_sz, "color": HAIRLINE})
+                runs.append({"text": CONTACT_DOT, "font": FONT,
+                             "size": self.contact_sz, "color": ACCENT})
+                runs.append({"text": SEP_CONTACT, "font": FONT,
+                             "size": self.contact_sz, "color": HAIRLINE})
+            runs.append({"text": text, "font": FONT, "size": self.contact_sz,
+                         "color": LINK if part.get("href") else MUTED,
+                         "href": part.get("href")})
+        if runs:
+            if drawn:
+                self.y -= self._rigid(NAME_TO_CONTACT)
+            self._inline(LEFT, self.y, runs, box_id=contact.get("id", ""))
+            drawn = True
+
+        # Double rule: the editorial signature under the masthead.
+        if drawn:
+            self.y -= self._rigid(CONTACT_TO_RULE)
+            self._rule(LEFT, self.y, RIGHT_EDGE, ACCENT, 1.0)
+            self._rule(LEFT, self.y - RULE_GAP * self.font_scale, RIGHT_EDGE, HAIRLINE, 0.5)
+
+        for si, section in enumerate(data.get("sections") or []):
+            self.y -= self._flex(SECTION_GAP_FIRST if si == 0 else SECTION_GAP)
+            # The label shares this baseline with the section's first content
+            # line, so no vertical space is spent on a stacked heading.
+            self._rail_label(section.get("id", ""), _s(section.get("title")))
+
+            if section["type"] == "bullets":
+                shown = False
+                for b in section.get("bullets") or []:
+                    if shown:
+                        self.y -= self.line
+                    shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
+
+            elif section["type"] == "entries":
+                for ei, entry in enumerate(section.get("entries") or []):
+                    if ei > 0:
+                        self.y -= self._rigid(LINE) + self._flex(ENTRY_SPACE)
+                    shown = self._title_with_date(entry.get("id", ""),
+                                                  entry.get("heading"), FONT_BOLD,
+                                                  entry.get("date"))
+                    meta = _s(entry.get("meta"))
+                    if meta:
+                        if shown:
+                            self.y -= self._rigid(SUBLINE_GAP)
+                        self._inline(COL_X, self.y, [{
+                            "text": meta, "font": FONT_ITALIC,
+                            "size": self.body, "color": MUTED,
+                        }])
+                        shown = True
+                    for b in entry.get("bullets") or []:
+                        if shown:
+                            self.y -= self.line
+                        shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
+
+            elif section["type"] == "org_entries":
+                for ei, entry in enumerate(section.get("entries") or []):
+                    if ei > 0:
+                        self.y -= self._rigid(LINE) + self._flex(ENTRY_SPACE)
+                    shown = self._title_with_date(entry.get("id", ""),
+                                                  entry.get("org"), FONT_BOLD,
+                                                  entry.get("date"))
+                    subline = self._joined([
+                        (_s(entry.get("role")), FONT, INK),
+                        (_s(entry.get("location")), FONT_ITALIC, MUTED),
+                    ], SEP_ROLE, self.body)
+                    if subline:
+                        if shown:
+                            self.y -= self._rigid(SUBLINE_GAP)
+                        self._inline(COL_X, self.y, subline)
+                        shown = True
+                    for b in entry.get("bullets") or []:
+                        if shown:
+                            self.y -= self.line
+                        shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
+
+            elif section["type"] == "education":
+                school = section.get("school") or {}
+                school_text = _s(school.get("text"))
+                shown = bool(school_text)
+                if shown:
+                    self._text(COL_X, self.y, school_text, FONT_BOLD, self.body, INK)
+                    self.elements[school.get("id", "")] = (COL_X, self.y, COL_W, self.body)
+                for b in section.get("bullets") or []:
+                    if shown:
+                        self.y -= self.line
+                    shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
+
+        if not self.measure:
+            self.c.showPage()
+            self.c.save()
+        return {"bottom_y": round(self.y, 2), "element_boxes": self.elements}
+
+
+# -----------------------------------------------------------------------------
+# Auto-fit
+# -----------------------------------------------------------------------------
+def _content_span(data: dict, font_scale: float, gap_scale: float) -> float:
+    pdf = ResumePDF(None, font_scale=font_scale, gap_scale=gap_scale,
+                    start_baseline=START_BASELINE, measure=True)
+    pdf.build(data)
+    return START_BASELINE - pdf.y
+
+
+def _name_ascent(font_scale: float) -> float:
+    return getAscentDescent(FONT_BOLD, NAME_SIZE * font_scale)[0]
+
+
+def _body_descent(font_scale: float) -> float:
+    return -getAscentDescent(FONT, BODY_SIZE * font_scale)[1]
+
+
+def create_resume_pdf(output_path: str, RESUME_DATA: Optional[dict] = None,
+                      updates_by_id: Optional[Dict[str, str]] = None) -> Dict[str, object]:
+    """Render the resume, auto-fitting and vertically balancing to one page."""
+    import copy
+
+    if RESUME_DATA is None:
+        raise ValueError(
+            "atelier requires resume data; pass RESUME_DATA or pipe JSON on stdin."
+        )
+
+    data = copy.deepcopy(RESUME_DATA)
+    if updates_by_id:
+        data = apply_text_updates(data, updates_by_id)
+    # Prune before any layout pass so measure and draw agree, and so skipped
+    # parts cost no vertical space in the fit calculation.
+    data = prune_resume_data(data)
+
+    usable = PAGE_H - 2 * MIN_MARGIN
+
+    font_scale = FONT_SCALES[-1]
+    for fs in FONT_SCALES:
+        block = _name_ascent(fs) + _content_span(data, fs, 1.0) + _body_descent(fs)
+        if block <= usable:
+            font_scale = fs
+            break
+
+    top_pad, bot_pad = _name_ascent(font_scale), _body_descent(font_scale)
+
+    span1 = _content_span(data, font_scale, 1.0)
+    flex_per_unit = max(0.0, _content_span(data, font_scale, 2.0) - span1)
+    slack = usable - (top_pad + span1 + bot_pad)
+    gap_scale = 1.0
+    if slack > 0 and flex_per_unit > 0.5:
+        gap_room = flex_per_unit * (GAP_SCALE_MAX - 1.0)
+        gap_absorb = min(GAP_FILL_FRACTION * slack, gap_room)
+        gap_scale = 1.0 + gap_absorb / flex_per_unit
+
+    span = _content_span(data, font_scale, gap_scale)
+    block = top_pad + span + bot_pad
+    top_blank = max(MIN_MARGIN, (PAGE_H - block) / 2.0)
+    start_baseline = PAGE_H - top_blank - top_pad
+
+    pdf = ResumePDF(output_path, font_scale=font_scale, gap_scale=gap_scale,
+                    start_baseline=start_baseline)
+    result = pdf.build(data)
+
+    bottom_blank = PAGE_H - top_blank - block
+    result.update({
+        "sections_rendered": len(data["sections"]),
+        "fits_one_page": block <= usable + 0.5,
+        "font_size_used": round(BODY_SIZE * font_scale, 2),
+        "font_scale": round(font_scale, 3),
+        "gap_scale": round(gap_scale, 3),
+        "top_margin": round(top_blank, 1),
+        "bottom_margin": round(bottom_blank, 1),
+    })
+    if not result["fits_one_page"]:
+        result["warning"] = "Content still overflows one page. Shorten or remove optional bullets."
+    return result
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate an atelier resume PDF.")
+    parser.add_argument("output_filename",
+                        help="Name or path of the PDF file to generate.")
+    args = parser.parse_args()
+
+    RESUME_DATA = json.load(sys.stdin)
+
+    output_path = args.output_filename
+    if not output_path.lower().endswith(".pdf"):
+        output_path += ".pdf"
+    if not os.path.isabs(output_path):
+        output_path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)), output_path
+        )
+
+    print(create_resume_pdf(output_path, RESUME_DATA=RESUME_DATA))

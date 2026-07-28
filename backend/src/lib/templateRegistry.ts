@@ -13,20 +13,19 @@ const currentDirectory = path.dirname(currentFile);
 const jsonpath = path.resolve(currentDirectory, "../../../assets",);
 
 const TEMPLATE_FILES: Record<string, string> = {
-/*
-  atelier: path.join(
-    assetsDirectory,
-    "resume-templates/atelier.json",
-  ),
-
-  evergreen: path.join(
-    assetsDirectory,
-    "resume-templates/evergreen.json",
-  ),
-*/
   signal: path.join(
     jsonpath,
     "templates/signal/signal.json",
+  ),
+
+  evergreen: path.join(
+    jsonpath,
+    "templates/evergreen/evergreen.json",
+  ),
+
+  atelier: path.join(
+    jsonpath,
+    "templates/atelier/atelier.json",
   ),
 };
 

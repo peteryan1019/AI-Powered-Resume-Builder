@@ -17,7 +17,7 @@ export class ResumeTemplateService {
       id: 'evergreen',
       title: 'Evergreen',
       description: 'A clean, balanced resume for cross-functional roles and general applications.',
-      pdfPath: '/assets/Peter_Yan_Resume_Thales.pdf',
+      pdfPath: '/assets/resume_evergreen.pdf',
       highlight: 'Best for broad applications and quick tailoring.'
     },
     {
@@ -31,7 +31,7 @@ export class ResumeTemplateService {
       id: 'atelier',
       title: 'Atelier',
       description: 'A polished, editorial layout that gives experience sections more breathing room.',
-      pdfPath: '/assets/Peter_Yan_Resume_Thales.pdf',
+      pdfPath: '/assets/resume_atelier.pdf',
       highlight: 'Good when you want the page to feel more distinctive.'
     }
   ];
