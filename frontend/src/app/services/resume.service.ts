@@ -138,7 +138,7 @@ export interface RegenerateResumeResponse {
 export class ResumeService {
   private readonly http = inject(HttpClient);
 
-  private readonly apiURL = 'http://localhost:3000/api';
+  private readonly apiURL = '/api';
 
   createResume(userId: string, request: CreateResumeRequest): Observable<CreateResumeResponse> {
     return this.http.post<CreateResumeResponse>(`${this.apiURL}/users/${userId}/resumes`, request, {
