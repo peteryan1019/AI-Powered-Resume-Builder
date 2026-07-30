@@ -2,9 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-
 import { AuthService } from '../auth/auth.service';
-import { ResumeService, type EditableResumeResponse } from '../../services/resume.service';
+import { ResumeService,  type EntriesSection, type OrganizationEntriesSection, type ResumeBullet, type EditableResumeResponse} from '../../services/resume.service';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { finalize, switchMap, tap } from 'rxjs';
 
@@ -87,7 +86,23 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                 @switch (section.type) {
                   @case ('bullets') {
-                    <div class="item-card" *ngFor="let bullet of section.bullets">
+                    <div
+                      class="item-card"
+                      *ngFor="
+                        let bullet of section.bullets;
+                        let bulletIndex = index
+                      "
+                    >
+                      <button
+                        type="button"
+                        class="delete-button"
+                        (click)="deleteBullet(section.bullets, bulletIndex)"
+                        aria-label="Delete bullet"
+                        title="Delete bullet"
+                      >
+                      
+                      </button>
+
                       <label *ngIf="bullet.label !== undefined">
                         Label
                         <input type="text" [(ngModel)]="bullet.label" />
@@ -103,10 +118,34 @@ import { finalize, switchMap, tap } from 'rxjs';
                         <input type="text" [(ngModel)]="bullet.url" />
                       </label>
                     </div>
+
+                    <button
+                      type="button"
+                      class="add-button"
+                      (click)="addBullet(section.bullets, true)"
+                    >
+                      + Add bullet
+                    </button>
                   }
 
                   @case ('entries') {
-                    <div class="entry-card" *ngFor="let entry of section.entries">
+                    <div
+                      class="entry-card"
+                      *ngFor="
+                        let entry of section.entries;
+                        let entryIndex = index
+                      "
+                    >
+                      <button
+                        type="button"
+                        class="delete-button"
+                        (click)="deleteEntry(section.entries, entryIndex)"
+                        aria-label="Delete entry"
+                        title="Delete entry"
+                      >
+                      
+                      </button>
+
                       <label>
                         Heading
                         <input type="text" [(ngModel)]="entry.heading" />
@@ -124,17 +163,65 @@ import { finalize, switchMap, tap } from 'rxjs';
                         </label>
                       </div>
 
-                      <div class="item-card" *ngFor="let bullet of entry.bullets">
+                      <div
+                        class="item-card"
+                        *ngFor="
+                          let bullet of entry.bullets;
+                          let bulletIndex = index
+                        "
+                      >
+                        <button
+                          type="button"
+                          class="delete-button"
+                          (click)="deleteBullet(entry.bullets, bulletIndex)"
+                          aria-label="Delete bullet"
+                          title="Delete bullet"
+                        >
+                        
+                        </button>
+
                         <label>
                           Bullet
                           <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
                         </label>
                       </div>
+
+                      <button
+                        type="button"
+                        class="add-button compact"
+                        (click)="addBullet(entry.bullets)"
+                      >
+                        + Add bullet
+                      </button>
                     </div>
+
+                    <button
+                      type="button"
+                      class="add-button"
+                      (click)="addStandardEntry(section)"
+                    >
+                      + Add entry
+                    </button>
                   }
 
                   @case ('org_entries') {
-                    <div class="entry-card" *ngFor="let entry of section.entries">
+                    <div
+                      class="entry-card"
+                      *ngFor="
+                        let entry of section.entries;
+                        let entryIndex = index
+                      "
+                    >
+                      <button
+                        type="button"
+                        class="delete-button"
+                        (click)="deleteEntry(section.entries, entryIndex)"
+                        aria-label="Delete experience"
+                        title="Delete experience"
+                      >
+                      
+                      </button>
+
                       <div class="two-columns">
                         <label>
                           Organization
@@ -157,13 +244,45 @@ import { finalize, switchMap, tap } from 'rxjs';
                         </label>
                       </div>
 
-                      <div class="item-card" *ngFor="let bullet of entry.bullets">
+                      <div
+                        class="item-card"
+                        *ngFor="
+                          let bullet of entry.bullets;
+                          let bulletIndex = index
+                        "
+                      >
+                        <button
+                          type="button"
+                          class="delete-button"
+                          (click)="deleteBullet(entry.bullets, bulletIndex)"
+                          aria-label="Delete bullet"
+                          title="Delete bullet"
+                        >
+                        
+                        </button>
+
                         <label>
                           Bullet
                           <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
                         </label>
                       </div>
+
+                      <button
+                        type="button"
+                        class="add-button compact"
+                        (click)="addBullet(entry.bullets)"
+                      >
+                        + Add bullet
+                      </button>
                     </div>
+
+                    <button
+                      type="button"
+                      class="add-button"
+                      (click)="addOrganizationEntry(section)"
+                    >
+                      + Add experience
+                    </button>
                   }
 
                   @case ('education') {
@@ -172,12 +291,36 @@ import { finalize, switchMap, tap } from 'rxjs';
                       <input type="text" [(ngModel)]="section.school.text" />
                     </label>
 
-                    <div class="item-card" *ngFor="let bullet of section.bullets">
+                    <div
+                      class="item-card"
+                      *ngFor="
+                        let bullet of section.bullets;
+                        let bulletIndex = index
+                      "
+                    >
+                      <button
+                        type="button"
+                        class="delete-button"
+                        (click)="deleteBullet(section.bullets, bulletIndex)"
+                        aria-label="Delete education bullet"
+                        title="Delete education bullet"
+                      >
+                      
+                      </button>
+
                       <label>
                         Bullet
                         <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
                       </label>
                     </div>
+
+                    <button
+                      type="button"
+                      class="add-button"
+                      (click)="addBullet(section.bullets)"
+                    >
+                      + Add education bullet
+                    </button>
                   }
                 }
               </article>
@@ -247,9 +390,11 @@ import { finalize, switchMap, tap } from 'rxjs';
 
       .entry-card,
       .item-card {
+        position: relative;
         display: grid;
         gap: 0.8rem;
         padding: 1rem;
+        padding-right: 3.25rem;
         border-radius: 0.75rem;
         background: rgba(255, 255, 255, 0.04);
       }
@@ -260,6 +405,57 @@ import { finalize, switchMap, tap } from 'rxjs';
 
       .item-card {
         margin-top: 0.5rem;
+      }
+
+      .add-button,
+      .delete-button {
+        color: #fff;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        transition:
+          transform 0.16s ease,
+          background 0.16s ease;
+      }
+
+      .add-button {
+        justify-self: start;
+        padding: 0.6rem 0.9rem;
+        border: 1px solid rgba(122, 97, 255, 0.55);
+        border-radius: 0.65rem;
+        background: rgba(122, 97, 255, 0.16);
+      }
+
+      .add-button.compact {
+        padding: 0.48rem 0.75rem;
+        font-size: 0.84rem;
+      }
+
+      .add-button:hover {
+        background: rgba(122, 97, 255, 0.3);
+        transform: translateY(-1px);
+      }
+
+      .delete-button {
+        position: absolute;
+        top: 0.7rem;
+        right: 0.7rem;
+        display: grid;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        place-items: center;
+        border: 1px solid rgba(255, 124, 124, 0.38);
+        border-radius: 50%;
+        background: rgba(255, 92, 92, 0.12);
+        color: #ffb3b3;
+        font-size: 1.25rem;
+        line-height: 1;
+      }
+
+      .delete-button:hover {
+        background: rgba(255, 92, 92, 0.28);
+        transform: scale(1.04);
       }
 
       .two-columns,
@@ -424,6 +620,75 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
       },
     });
   }
+
+private createBullet(includeLabel = false, includeUrl = false,): ResumeBullet {
+  return {
+    id: `bullet-${crypto.randomUUID()}`,
+    text: '',
+    ...(includeLabel ? { label: '' } : {}),
+    ...(includeUrl ? { url: '' } : {}),
+  };
+}
+
+addBullet(bullets: ResumeBullet[], includeLabel = false): void {
+  const includeUrl = bullets.some(
+    (bullet) => bullet.url !== undefined,
+  );
+
+  bullets.push(this.createBullet(includeLabel, includeUrl));
+  this.scheduleAutoSave();
+}
+
+deleteBullet(bullets: ResumeBullet[], bulletIndex: number): void {
+  const confirmed = window.confirm(
+    'Ar you sure you want to delete this bullet?',
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  bullets.splice(bulletIndex, 1);
+  this.scheduleAutoSave();
+}
+
+addStandardEntry(section: EntriesSection): void {
+  section.entries.push({
+    id: `entry-${crypto.randomUUID()}`,
+    heading: '',
+    meta: '',
+    date: '',
+    bullets: [this.createBullet()],
+  });
+
+  this.scheduleAutoSave();
+}
+
+addOrganizationEntry(section: OrganizationEntriesSection): void {
+  section.entries.push({
+    id: `organization-entry-${crypto.randomUUID()}`,
+    org: '',
+    role: '',
+    location: '',
+    date: '',
+    bullets: [this.createBullet()],
+  });
+
+  this.scheduleAutoSave();
+}
+
+deleteEntry<T>(entries: T[], entryIndex: number): void {
+  const confirmed = window.confirm(
+    'Delete this entire entry? This will also delete its bullets.',
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  entries.splice(entryIndex, 1);
+  this.scheduleAutoSave();
+}
 
   private performSave(): void {
     const currentResume = this.resume();
