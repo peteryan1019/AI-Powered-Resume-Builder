@@ -100,7 +100,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         aria-label="Delete bullet"
                         title="Delete bullet"
                       >
-                      
+                        <span aria-hidden="true">🗑</span>
                       </button>
 
                       <label *ngIf="bullet.label !== undefined">
@@ -143,7 +143,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         aria-label="Delete entry"
                         title="Delete entry"
                       >
-                      
+                        <span aria-hidden="true">🗑</span>
                       </button>
 
                       <label>
@@ -177,7 +177,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                           aria-label="Delete bullet"
                           title="Delete bullet"
                         >
-                        
+                          <span aria-hidden="true">🗑</span>
                         </button>
 
                         <label>
@@ -219,7 +219,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         aria-label="Delete experience"
                         title="Delete experience"
                       >
-                      
+                        <span aria-hidden="true">🗑</span>
                       </button>
 
                       <div class="two-columns">
@@ -258,7 +258,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                           aria-label="Delete bullet"
                           title="Delete bullet"
                         >
-                        
+                          <span aria-hidden="true">🗑</span>
                         </button>
 
                         <label>
@@ -302,10 +302,10 @@ import { finalize, switchMap, tap } from 'rxjs';
                         type="button"
                         class="delete-button"
                         (click)="deleteBullet(section.bullets, bulletIndex)"
-                        aria-label="Delete education bullet"
-                        title="Delete education bullet"
+                        aria-label="Delete bullet"
+                        title="Delete bullet"
                       >
-                      
+                        <span aria-hidden="true">🗑</span>
                       </button>
 
                       <label>
@@ -319,7 +319,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                       class="add-button"
                       (click)="addBullet(section.bullets)"
                     >
-                      + Add education bullet
+                      + Add bullet
                     </button>
                   }
                 }
