@@ -2,13 +2,14 @@ name: Publish Backend to GHCR
 
 on:
   push:
-    # Deploy branch. Change this to your final branch (e.g. main) when ready.
     branches:
-      - cicd
+      - main
     paths:
       - backend/**
       - assets/**
       - docker-compose.yml
+      - .github/workflows/build-backend.yml
+  workflow_dispatch:
 
 env:
   IMAGE_NAME: backend-resumebuilder
@@ -16,7 +17,10 @@ env:
 jobs:
   push:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
@@ -25,18 +29,27 @@ jobs:
         run: docker build -f backend/Dockerfile --tag $IMAGE_NAME .
 
       - name: Log into GitHub Container Registry
-        run: echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Push image to GitHub Container Registry
         run: |
           IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
+          docker tag $IMAGE_NAME $IMAGE_ID:${{ github.sha }}
           docker tag $IMAGE_NAME $IMAGE_ID:latest
+          docker push $IMAGE_ID:${{ github.sha }}
           docker push $IMAGE_ID:latest
 
   deploy:
     needs: push
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: production-deployment
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
     steps:
       - uses: actions/checkout@v4
 
@@ -46,8 +59,10 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           source: docker-compose.yml
-          target: ~/
+          target: /opt/resumebuilder/
+          overwrite: true
 
       - name: Pull images and restart containers on the droplet
         uses: appleboy/ssh-action@v1.0.3
@@ -55,8 +70,14 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          fingerprint: ${{ secrets.SSH_FINGERPRINT }}
           script: |
-            cd ~
-            echo "${{ secrets.CR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            set -eu
+            cd /opt/resumebuilder
+            test -f .env
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
+            docker compose config --quiet
             docker compose pull
-            docker compose up -d
+            docker compose up -d --remove-orphans
+            docker compose ps
