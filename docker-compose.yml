@@ -56,7 +56,7 @@ services:
     logging: *default-logging
 
   backend:
-    image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder:latest
+    image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
     container_name: backend
     restart: unless-stopped
     depends_on:
@@ -81,7 +81,7 @@ services:
     logging: *default-logging
 
   frontend:
-    image: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder:latest
+    image: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder-peteryan1019:latest
     container_name: frontend
     restart: unless-stopped
     depends_on:
