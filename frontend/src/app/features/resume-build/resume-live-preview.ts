@@ -1,13 +1,13 @@
 import { CommonModule } from '@angular/common';
 import {
   Component,
+  ElementRef,
+  EventEmitter,
   Input,
   OnChanges,
   Output,
   SimpleChanges,
   inject,
-  ElementRef,
-  EventEmitter,
 } from '@angular/core';
 import type { ResumeContent } from '../../services/resume.service';
 
@@ -16,11 +16,7 @@ import type { ResumeContent } from '../../services/resume.service';
   standalone: true,
   imports: [CommonModule],
   template: `
-    <article
-      class="resume-page"
-      [ngClass]="'template-' + templateId"
-      (click)="selectFromPreview($event)"
-    >
+    <article class="resume-page" [ngClass]="templateClass" (click)="selectFromPreview($event)">
       <header class="resume-header">
         <h1
           [attr.data-resume-id]="content.header.name.id"
@@ -43,7 +39,7 @@ import type { ResumeContent } from '../../services/resume.service';
       </header>
 
       @for (section of content.sections; track section.id) {
-        <section class="resume-section">
+        <section class="resume-section" [ngClass]="'section-' + section.type">
           <h2 [attr.data-resume-id]="section.id" [class.edit-highlight]="isHighlighted(section.id)">
             {{ section.title }}
           </h2>
@@ -57,10 +53,14 @@ import type { ResumeContent } from '../../services/resume.service';
                     [class.edit-highlight]="isHighlighted(bullet.id)"
                   >
                     @if (bullet.label) {
-                      <strong>{{ bullet.label }}:</strong>
+                      <strong>{{ bullet.label }}</strong>
                     }
 
                     {{ bullet.text }}
+
+                    @if (bullet.url) {
+                      <a [href]="bullet.url">{{ bullet.url }}</a>
+                    }
                   </li>
                 }
               </ul>
@@ -69,17 +69,22 @@ import type { ResumeContent } from '../../services/resume.service';
             @case ('entries') {
               @for (entry of section.entries; track entry.id) {
                 <article
-                  class="resume-entry"
+                  class="resume-entry project-entry"
                   [attr.data-resume-id]="entry.id"
                   [class.edit-highlight]="isHighlighted(entry.id)"
                 >
-                  <div class="entry-heading">
-                    <strong>{{ entry.heading }}</strong>
-                    <span>{{ entry.date }}</span>
-                  </div>
+                  <div class="project-heading">
+                    @if (entry.heading) {
+                      <strong class="entry-title">{{ entry.heading }}</strong>
+                    }
 
-                  <div class="entry-meta">
-                    {{ entry.meta }}
+                    @if (entry.meta) {
+                      <span class="entry-meta">{{ entry.meta }}</span>
+                    }
+
+                    @if (entry.date) {
+                      <span class="entry-date">{{ entry.date }}</span>
+                    }
                   </div>
 
                   <ul>
@@ -89,6 +94,10 @@ import type { ResumeContent } from '../../services/resume.service';
                         [class.edit-highlight]="isHighlighted(bullet.id)"
                       >
                         {{ bullet.text }}
+
+                        @if (bullet.url) {
+                          <a [href]="bullet.url">{{ bullet.url }}</a>
+                        }
                       </li>
                     }
                   </ul>
@@ -99,18 +108,26 @@ import type { ResumeContent } from '../../services/resume.service';
             @case ('org_entries') {
               @for (entry of section.entries; track entry.id) {
                 <article
-                  class="resume-entry"
+                  class="resume-entry organization-entry"
                   [attr.data-resume-id]="entry.id"
                   [class.edit-highlight]="isHighlighted(entry.id)"
                 >
-                  <div class="entry-heading">
-                    <strong>{{ entry.org }}</strong>
-                    <span>{{ entry.date }}</span>
-                  </div>
+                  <div class="organization-heading">
+                    @if (entry.org) {
+                      <strong class="entry-organization">{{ entry.org }}</strong>
+                    }
 
-                  <div class="entry-heading secondary">
-                    <span>{{ entry.role }}</span>
-                    <span>{{ entry.location }}</span>
+                    @if (entry.role) {
+                      <span class="entry-role">{{ entry.role }}</span>
+                    }
+
+                    @if (entry.location) {
+                      <span class="entry-location">{{ entry.location }}</span>
+                    }
+
+                    @if (entry.date) {
+                      <span class="entry-date">{{ entry.date }}</span>
+                    }
                   </div>
 
                   <ul>
@@ -120,6 +137,10 @@ import type { ResumeContent } from '../../services/resume.service';
                         [class.edit-highlight]="isHighlighted(bullet.id)"
                       >
                         {{ bullet.text }}
+
+                        @if (bullet.url) {
+                          <a [href]="bullet.url">{{ bullet.url }}</a>
+                        }
                       </li>
                     }
                   </ul>
@@ -143,6 +164,10 @@ import type { ResumeContent } from '../../services/resume.service';
                     [class.edit-highlight]="isHighlighted(bullet.id)"
                   >
                     {{ bullet.text }}
+
+                    @if (bullet.url) {
+                      <a [href]="bullet.url">{{ bullet.url }}</a>
+                    }
                   </li>
                 }
               </ul>
@@ -156,101 +181,524 @@ import type { ResumeContent } from '../../services/resume.service';
     `
       :host {
         display: block;
+        container-type: inline-size;
       }
 
       .resume-page {
-        --resume-accent: #174785;
+        --resume-accent: #1f3864;
+        --resume-ink: #000;
+        --resume-muted: #666;
+        --resume-hairline: #c7ccc8;
+        --resume-link: #1155cc;
+        --body-size: 1.797cqw;
+        --body-leading: 1.22;
         box-sizing: border-box;
         width: 100%;
-        aspect-ratio: 8.5 / 11;
-        padding: 6% 7%;
+        min-height: 129.412cqw;
+        margin: 0;
+        padding: 2.7% 2.94%;
         background: #fff;
-        color: #111;
-        font-family: Arial, Helvetica, sans-serif;
-        font-size: 0.72rem;
-        line-height: 1.3;
+        color: var(--resume-ink);
+        font-family: Carlito, Calibri, Arial, Helvetica, sans-serif;
+        font-size: var(--body-size);
+        line-height: var(--body-leading);
       }
 
-      .template-signal {
-        --resume-accent: #174785;
-      }
-
-      .template-evergreen {
-        --resume-accent: #28634a;
-      }
-
-      .template-atelier {
-        --resume-accent: #794b36;
+      .resume-page,
+      .resume-page * {
+        box-sizing: border-box;
       }
 
       .resume-header {
-        margin-bottom: 1.25rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid var(--resume-accent);
-        text-align: left;
+        margin: 0;
       }
 
       .resume-header h1 {
-        margin: 0 0 0.25rem;
-        color: var(--resume-accent);
-        font-size: 1.45rem;
+        margin: 0;
+        font-size: inherit;
+        line-height: 1;
       }
 
       .contact-line {
         display: flex;
         flex-wrap: wrap;
-        justify-content: center;
-        gap: 0.25rem 0.65rem;
-        font-size: 0.68rem;
+        align-items: baseline;
+        gap: 0;
+      }
+
+      .contact-line > span + span::before {
+        white-space: pre;
       }
 
       a {
-        color: var(--resume-accent);
+        color: var(--resume-link);
+        text-decoration: underline;
+        text-underline-offset: 0.08em;
       }
 
       .resume-section {
-        margin-top: 0.9rem;
+        margin: 0;
       }
 
       .resume-section h2 {
-        margin: 0 0 0.5rem;
-        padding-bottom: 0.18rem;
-        border-bottom: 1px solid var(--resume-accent);
-        color: var(--resume-accent);
-        font-size: 0.86rem;
+        margin: 0;
+        font-size: inherit;
+        line-height: 1;
       }
 
-      .resume-entry {
-        margin-bottom: 0.65rem;
+      .resume-entry,
+      .education-school {
+        margin: 0;
       }
 
-      .entry-heading {
-        display: flex;
-        justify-content: space-between;
-        gap: 1rem;
+      .project-heading,
+      .organization-heading {
+        min-width: 0;
       }
 
-      .entry-heading.secondary {
-        color: #444;
-        font-style: italic;
+      .entry-meta,
+      .entry-location,
+      .entry-date {
+        color: var(--resume-muted);
       }
 
-      .entry-meta {
-        color: #444;
+      .entry-meta,
+      .entry-location {
         font-style: italic;
       }
 
       ul {
-        margin: 0.25rem 0 0;
-        padding-left: 1.15rem;
+        margin: 0;
+        padding: 0;
+        list-style: none;
       }
 
       li {
-        margin-bottom: 0.15rem;
+        position: relative;
+        margin: 0;
+      }
+
+      li::before {
+        position: absolute;
+        font-weight: 400;
+      }
+
+      /* Signal ------------------------------------------------------------ */
+      .template-signal {
+        --resume-accent: #1f3864;
+        --resume-ink: #000;
+        --resume-muted: #666;
+        --resume-hairline: #1f3864;
+        --resume-link: #1155cc;
+        --body-size: 1.797cqw;
+        --body-leading: 1.221;
+        padding: 2.7% 2.94%;
+      }
+
+      .template-signal .resume-header {
+        text-align: center;
+      }
+
+      .template-signal .resume-header h1 {
+        color: var(--resume-accent);
+        font-size: 3.268cqw;
+        font-weight: 700;
+      }
+
+      .template-signal .contact-line {
+        justify-content: center;
+        margin-top: 0.92cqw;
+        color: #444;
+      }
+
+      .template-signal .contact-line > span + span::before {
+        content: ' • ';
+        color: #444;
+      }
+
+      .template-signal .resume-section {
+        margin-top: 4.1cqw;
+      }
+
+      .template-signal .resume-section h2 {
+        padding-bottom: 0.93cqw;
+        border-bottom: 0.13cqw solid var(--resume-accent);
+        color: var(--resume-accent);
+        font-size: 1.961cqw;
+        font-weight: 700;
+      }
+
+      .template-signal .resume-section > ul,
+      .template-signal .resume-section > .resume-entry,
+      .template-signal .resume-section > .education-school {
+        margin-top: 2.7cqw;
+      }
+
+      .template-signal .resume-entry + .resume-entry {
+        margin-top: 3.75cqw;
+      }
+
+      .template-signal .project-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+      }
+
+      .template-signal .project-heading > * + *::before {
+        content: ' • ';
+        white-space: pre;
+        color: var(--resume-ink);
+        font-style: normal;
+        font-weight: 400;
+      }
+
+      .template-signal .organization-heading {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+      }
+
+      .template-signal .entry-organization {
+        flex-basis: 100%;
+      }
+
+      .template-signal .organization-heading > .entry-location::before,
+      .template-signal .organization-heading > .entry-date::before {
+        content: ' • ';
+        white-space: pre;
+        color: var(--resume-ink);
+        font-style: normal;
+      }
+
+      .template-signal .resume-entry > ul,
+      .template-signal .section-education > ul {
+        margin-top: 0.55cqw;
+      }
+
+      .template-signal li {
+        padding-left: 2.94cqw;
+      }
+
+      .template-signal li + li {
+        margin-top: 0.28cqw;
+      }
+
+      .template-signal li::before {
+        left: 0.98cqw;
+        content: '•';
+        color: var(--resume-ink);
+      }
+
+      /* Evergreen --------------------------------------------------------- */
+      .template-evergreen {
+        --resume-accent: #164a3a;
+        --resume-ink: #212121;
+        --resume-muted: #6b6b6b;
+        --resume-hairline: #c7ccc8;
+        --resume-link: #165a4a;
+        --body-size: 1.716cqw;
+        --body-leading: 1.2;
+        padding: 6.55% 7.52%;
+      }
+
+      .template-evergreen .resume-header {
+        padding-bottom: 1.55cqw;
+        border-bottom: 0.18cqw solid var(--resume-accent);
+        text-align: left;
+      }
+
+      .template-evergreen .resume-header h1 {
+        color: var(--resume-accent);
+        font-size: 3.431cqw;
+        font-weight: 700;
+        letter-spacing: 0.098cqw;
+      }
+
+      .template-evergreen .contact-line {
+        justify-content: flex-start;
+        margin-top: 0.98cqw;
+        color: var(--resume-muted);
+        font-size: 1.569cqw;
+      }
+
+      .template-evergreen .contact-line > span + span::before {
+        content: '  ·  ';
+        color: var(--resume-hairline);
+      }
+
+      .template-evergreen .resume-section {
+        margin-top: 3.43cqw;
+      }
+
+      .template-evergreen .resume-section:first-of-type {
+        margin-top: 3.92cqw;
+      }
+
+      .template-evergreen .resume-section h2 {
+        display: flex;
+        align-items: center;
+        gap: 1.47cqw;
+        color: var(--resume-accent);
+        font-size: 1.601cqw;
+        font-weight: 700;
+        letter-spacing: 0.221cqw;
+        white-space: nowrap;
+      }
+
+      .template-evergreen .resume-section h2::after {
+        height: 1px;
+        flex: 1;
+        background: var(--resume-hairline);
+        content: '';
+      }
+
+      .template-evergreen .resume-section > ul,
+      .template-evergreen .resume-section > .resume-entry,
+      .template-evergreen .resume-section > .education-school {
+        margin-top: 2.45cqw;
+      }
+
+      .template-evergreen .resume-entry + .resume-entry {
+        margin-top: 3.36cqw;
+      }
+
+      .template-evergreen .project-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 2.29cqw;
+        align-items: baseline;
+      }
+
+      .template-evergreen .project-heading .entry-title {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .template-evergreen .project-heading .entry-date {
+        grid-column: 2;
+        grid-row: 1;
+        white-space: nowrap;
+      }
+
+      .template-evergreen .entry-meta {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      .template-evergreen .organization-heading {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        column-gap: 0.45cqw;
+        align-items: baseline;
+      }
+
+      .template-evergreen .entry-organization {
+        grid-column: 1 / 3;
+        grid-row: 1;
+      }
+
+      .template-evergreen .organization-heading .entry-date {
+        grid-column: 3;
+        grid-row: 1;
+        white-space: nowrap;
+      }
+
+      .template-evergreen .entry-role {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .template-evergreen .entry-location {
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      .template-evergreen .entry-role + .entry-location::before {
+        content: '  ·  ';
+        white-space: pre;
+        color: var(--resume-hairline);
+        font-style: normal;
+      }
+
+      .template-evergreen .resume-entry > ul,
+      .template-evergreen .section-education > ul {
+        margin-top: 0.6cqw;
+      }
+
+      .template-evergreen li {
+        padding-left: 2.29cqw;
+      }
+
+      .template-evergreen li + li {
+        margin-top: 0.34cqw;
+      }
+
+      .template-evergreen li::before {
+        left: 0.33cqw;
+        content: '–';
+        color: var(--resume-accent);
+      }
+
+      /* Atelier ----------------------------------------------------------- */
+      .template-atelier {
+        --resume-accent: #66212a;
+        --resume-ink: #1d1c1b;
+        --resume-muted: #6f6d6a;
+        --resume-hairline: #d0cdc9;
+        --resume-link: #5c3732;
+        --body-size: 1.634cqw;
+        --body-leading: 1.22;
+        padding: 6.3% 7.19% 6.3% 6.54%;
+      }
+
+      .template-atelier .resume-header {
+        position: relative;
+        padding-bottom: 1.63cqw;
+        border-bottom: 0.16cqw solid var(--resume-accent);
+        text-align: left;
+      }
+
+      .template-atelier .resume-header::after {
+        position: absolute;
+        right: 0;
+        bottom: -0.43cqw;
+        left: 0;
+        border-top: 1px solid var(--resume-hairline);
+        content: '';
+      }
+
+      .template-atelier .resume-header h1 {
+        color: var(--resume-ink);
+        font-size: 3.268cqw;
+        font-weight: 700;
+        letter-spacing: 0.245cqw;
+      }
+
+      .template-atelier .contact-line {
+        justify-content: flex-start;
+        margin-top: 0.98cqw;
+        color: var(--resume-muted);
+        font-size: 1.503cqw;
+        letter-spacing: 0.057cqw;
+      }
+
+      .template-atelier .contact-line > span + span::before {
+        content: '  ·  ';
+        color: var(--resume-accent);
+      }
+
+      .template-atelier .resume-section {
+        display: grid;
+        grid-template-columns: 15.03% 2.61% minmax(0, 1fr);
+        margin-top: 3.43cqw;
+        align-items: start;
+      }
+
+      .template-atelier .resume-section:first-of-type {
+        margin-top: 4.25cqw;
+      }
+
+      .template-atelier .resume-section > h2 {
+        grid-column: 1;
+        grid-row: 1;
+        color: var(--resume-accent);
+        font-size: 1.373cqw;
+        font-weight: 700;
+        letter-spacing: 0.18cqw;
+        line-height: 1.25;
+        text-align: right;
+      }
+
+      .template-atelier .resume-section > ul,
+      .template-atelier .resume-section > .resume-entry,
+      .template-atelier .resume-section > .education-school {
+        grid-column: 3;
+      }
+
+      .template-atelier .resume-entry + .resume-entry {
+        margin-top: 3.4cqw;
+      }
+
+      .template-atelier .project-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        column-gap: 1.96cqw;
+        align-items: baseline;
+      }
+
+      .template-atelier .project-heading .entry-title {
+        grid-column: 1;
+        grid-row: 1;
+      }
+
+      .template-atelier .project-heading .entry-date {
+        grid-column: 2;
+        grid-row: 1;
+        white-space: nowrap;
+      }
+
+      .template-atelier .entry-meta {
+        grid-column: 1 / -1;
+        grid-row: 2;
+      }
+
+      .template-atelier .organization-heading {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        column-gap: 0.45cqw;
+        align-items: baseline;
+      }
+
+      .template-atelier .entry-organization {
+        grid-column: 1 / 3;
+        grid-row: 1;
+      }
+
+      .template-atelier .organization-heading .entry-date {
+        grid-column: 3;
+        grid-row: 1;
+        white-space: nowrap;
+      }
+
+      .template-atelier .entry-role {
+        grid-column: 1;
+        grid-row: 2;
+      }
+
+      .template-atelier .entry-location {
+        grid-column: 2;
+        grid-row: 2;
+      }
+
+      .template-atelier .entry-role + .entry-location::before {
+        content: '  ·  ';
+        white-space: pre;
+        color: var(--resume-hairline);
+        font-style: normal;
+      }
+
+      .template-atelier .resume-entry > ul,
+      .template-atelier .section-education > ul {
+        margin-top: 0.55cqw;
+      }
+
+      .template-atelier li {
+        padding-left: 1.63cqw;
+      }
+
+      .template-atelier li + li {
+        margin-top: 0.32cqw;
+      }
+
+      .template-atelier li::before {
+        left: 0;
+        content: '·';
+        color: var(--resume-accent);
+        font-size: 1.2em;
       }
 
       .edit-highlight {
-        outline: 2px solid rgba(231, 170, 0, 0.75);
+        outline: 2px solid rgba(231, 170, 0, 0.78);
         outline-offset: 2px;
         border-radius: 0.15rem;
         background: rgba(255, 225, 70, 0.35);
@@ -279,11 +727,15 @@ export class ResumeLivePreview implements OnChanges {
   @Input({ required: true })
   content!: ResumeContent;
 
-  @Input()
-  templateId = 'signal';
+  @Input({ required: true })
+  templateId!: string;
 
   @Input()
   activeElementId: string | null = null;
+
+  get templateClass(): string {
+    return `template-${this.templateId.trim().toLowerCase()}`;
+  }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['activeElementId'] && this.activeElementId) {
@@ -325,9 +777,7 @@ export class ResumeLivePreview implements OnChanges {
 
   selectFromPreview(event: MouseEvent): void {
     const clickedElement = event.target as HTMLElement;
-
     const resumeElement = clickedElement.closest<HTMLElement>('[data-resume-id]');
-
     const id = resumeElement?.dataset['resumeId'];
 
     if (id) {
