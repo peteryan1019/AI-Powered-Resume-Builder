@@ -3,14 +3,21 @@ import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
-import { ResumeService,  type EntriesSection, type OrganizationEntriesSection, type ResumeBullet, type EditableResumeResponse} from '../../services/resume.service';
+import {
+  ResumeService,
+  type EntriesSection,
+  type OrganizationEntriesSection,
+  type ResumeBullet,
+  type EditableResumeResponse,
+} from '../../services/resume.service';
+import { ResumeLivePreview } from './resume-live-preview';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
 import { finalize, switchMap, tap } from 'rxjs';
 
 @Component({
   selector: 'app-resume-editor-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, ResumeLivePreview],
   template: `
     <section class="editor-page">
       <header class="editor-header">
@@ -56,7 +63,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
               <label>
                 Name
-                <input type="text" [(ngModel)]="loadedResume.content.header.name.text" />
+                <input
+                  type="text"
+                  [(ngModel)]="loadedResume.content.header.name.text"
+                  (focus)="highlightElement(loadedResume.content.header.name.id)"
+                  (blur)="clearHighlight()"
+                />
               </label>
 
               <h3>Contact information</h3>
@@ -67,7 +79,12 @@ import { finalize, switchMap, tap } from 'rxjs';
               >
                 <label>
                   {{ displayId(part.id) }}
-                  <input type="text" [(ngModel)]="part.text" />
+                  <input
+                    type="text"
+                    [(ngModel)]="part.text"
+                    (focus)="highlightElement(part.id)"
+                    (blur)="clearHighlight()"
+                  />
                 </label>
 
                 <label *ngIf="part.href !== undefined">
@@ -81,17 +98,19 @@ import { finalize, switchMap, tap } from 'rxjs';
               <article class="panel section-panel">
                 <label>
                   Section title
-                  <input type="text" [(ngModel)]="section.title" />
+                  <input
+                    type="text"
+                    [(ngModel)]="section.title"
+                    (focus)="highlightElement(section.id)"
+                    (blur)="clearHighlight()"
+                  />
                 </label>
 
                 @switch (section.type) {
                   @case ('bullets') {
                     <div
                       class="item-card"
-                      *ngFor="
-                        let bullet of section.bullets;
-                        let bulletIndex = index
-                      "
+                      *ngFor="let bullet of section.bullets; let bulletIndex = index"
                     >
                       <button
                         type="button"
@@ -110,7 +129,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <label>
                         Text
-                        <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
+                        <textarea
+                          rows="3"
+                          [(ngModel)]="bullet.text"
+                          (focus)="highlightElement(bullet.id)"
+                          (blur)="clearHighlight()"
+                        ></textarea>
                       </label>
 
                       <label *ngIf="bullet.url !== undefined">
@@ -131,10 +155,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                   @case ('entries') {
                     <div
                       class="entry-card"
-                      *ngFor="
-                        let entry of section.entries;
-                        let entryIndex = index
-                      "
+                      *ngFor="let entry of section.entries; let entryIndex = index"
                     >
                       <button
                         type="button"
@@ -148,7 +169,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <label>
                         Heading
-                        <input type="text" [(ngModel)]="entry.heading" />
+                        <input
+                          type="text"
+                          [(ngModel)]="entry.heading"
+                          (focus)="highlightElement(entry.id)"
+                          (blur)="clearHighlight()"
+                        />
                       </label>
 
                       <div class="two-columns">
@@ -165,10 +191,7 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <div
                         class="item-card"
-                        *ngFor="
-                          let bullet of entry.bullets;
-                          let bulletIndex = index
-                        "
+                        *ngFor="let bullet of entry.bullets; let bulletIndex = index"
                       >
                         <button
                           type="button"
@@ -182,7 +205,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                         <label>
                           Bullet
-                          <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
+                          <textarea
+                            rows="3"
+                            [(ngModel)]="bullet.text"
+                            (focus)="highlightElement(bullet.id)"
+                            (blur)="clearHighlight()"
+                          ></textarea>
                         </label>
                       </div>
 
@@ -195,11 +223,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                       </button>
                     </div>
 
-                    <button
-                      type="button"
-                      class="add-button"
-                      (click)="addStandardEntry(section)"
-                    >
+                    <button type="button" class="add-button" (click)="addStandardEntry(section)">
                       + Add entry
                     </button>
                   }
@@ -207,10 +231,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                   @case ('org_entries') {
                     <div
                       class="entry-card"
-                      *ngFor="
-                        let entry of section.entries;
-                        let entryIndex = index
-                      "
+                      *ngFor="let entry of section.entries; let entryIndex = index"
                     >
                       <button
                         type="button"
@@ -246,10 +267,7 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <div
                         class="item-card"
-                        *ngFor="
-                          let bullet of entry.bullets;
-                          let bulletIndex = index
-                        "
+                        *ngFor="let bullet of entry.bullets; let bulletIndex = index"
                       >
                         <button
                           type="button"
@@ -263,7 +281,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                         <label>
                           Bullet
-                          <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
+                          <textarea
+                            rows="3"
+                            [(ngModel)]="bullet.text"
+                            (focus)="highlightElement(bullet.id)"
+                            (blur)="clearHighlight()"
+                          ></textarea>
                         </label>
                       </div>
 
@@ -288,15 +311,17 @@ import { finalize, switchMap, tap } from 'rxjs';
                   @case ('education') {
                     <label>
                       School
-                      <input type="text" [(ngModel)]="section.school.text" />
+                      <input
+                        type="text"
+                        [(ngModel)]="section.school.text"
+                        (focus)="highlightElement(section.school.id)"
+                        (blur)="clearHighlight()"
+                      />
                     </label>
 
                     <div
                       class="item-card"
-                      *ngFor="
-                        let bullet of section.bullets;
-                        let bulletIndex = index
-                      "
+                      *ngFor="let bullet of section.bullets; let bulletIndex = index"
                     >
                       <button
                         type="button"
@@ -310,15 +335,16 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <label>
                         Bullet
-                        <textarea rows="3" [(ngModel)]="bullet.text"></textarea>
+                        <textarea
+                          rows="3"
+                          [(ngModel)]="bullet.text"
+                          (focus)="highlightElement(bullet.id)"
+                          (blur)="clearHighlight()"
+                        ></textarea>
                       </label>
                     </div>
 
-                    <button
-                      type="button"
-                      class="add-button"
-                      (click)="addBullet(section.bullets)"
-                    >
+                    <button type="button" class="add-button" (click)="addBullet(section.bullets)">
                       + Add bullet
                     </button>
                   }
@@ -331,11 +357,11 @@ import { finalize, switchMap, tap } from 'rxjs';
         <aside class="preview-panel">
           <h2>Resume preview</h2>
 
-          <iframe
-            *ngIf="pdfURL() as trustedPdfUrl"
-            [src]="trustedPdfUrl"
-            title="Resume PDF preview"
-          ></iframe>
+          <app-resume-live-preview
+            [content]="loadedResume.content"
+            [templateId]="loadedResume.templateId"
+            [activeElementId]="activeElementId()"
+          ></app-resume-live-preview>
         </aside>
       </div>
     </section>
@@ -552,12 +578,11 @@ import { finalize, switchMap, tap } from 'rxjs';
         top: 1rem;
       }
 
-      .preview-panel iframe {
+      .preview-panel app-resume-live-preview {
         display: block;
         width: 100%;
-        height: calc(100vh - 10rem);
-        min-height: 40rem;
-        border: 0;
+        max-height: calc(100vh - 10rem);
+        overflow: auto;
         border-radius: 0.5rem;
         background: white;
       }
@@ -592,6 +617,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   readonly successMessage = signal<string | null>(null);
   readonly pdfURL = signal<SafeResourceUrl | null>(null);
   readonly resume = signal<EditableResumeResponse['resume'] | null>(null);
+  readonly activeElementId = signal<string | null>(null);
 
   ngOnInit(): void {
     this.userId = this.auth.user()?.id ?? null;
@@ -621,74 +647,78 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
     });
   }
 
-private createBullet(includeLabel = false, includeUrl = false,): ResumeBullet {
-  return {
-    id: `bullet-${crypto.randomUUID()}`,
-    text: '',
-    ...(includeLabel ? { label: '' } : {}),
-    ...(includeUrl ? { url: '' } : {}),
-  };
-}
-
-addBullet(bullets: ResumeBullet[], includeLabel = false): void {
-  const includeUrl = bullets.some(
-    (bullet) => bullet.url !== undefined,
-  );
-
-  bullets.push(this.createBullet(includeLabel, includeUrl));
-  this.scheduleAutoSave();
-}
-
-deleteBullet(bullets: ResumeBullet[], bulletIndex: number): void {
-  const confirmed = window.confirm(
-    'Ar you sure you want to delete this bullet?',
-  );
-
-  if (!confirmed) {
-    return;
+  private createBullet(includeLabel = false, includeUrl = false): ResumeBullet {
+    return {
+      id: `bullet-${crypto.randomUUID()}`,
+      text: '',
+      ...(includeLabel ? { label: '' } : {}),
+      ...(includeUrl ? { url: '' } : {}),
+    };
   }
 
-  bullets.splice(bulletIndex, 1);
-  this.scheduleAutoSave();
-}
+  addBullet(bullets: ResumeBullet[], includeLabel = false): void {
+    const includeUrl = bullets.some((bullet) => bullet.url !== undefined);
 
-addStandardEntry(section: EntriesSection): void {
-  section.entries.push({
-    id: `entry-${crypto.randomUUID()}`,
-    heading: '',
-    meta: '',
-    date: '',
-    bullets: [this.createBullet()],
-  });
-
-  this.scheduleAutoSave();
-}
-
-addOrganizationEntry(section: OrganizationEntriesSection): void {
-  section.entries.push({
-    id: `organization-entry-${crypto.randomUUID()}`,
-    org: '',
-    role: '',
-    location: '',
-    date: '',
-    bullets: [this.createBullet()],
-  });
-
-  this.scheduleAutoSave();
-}
-
-deleteEntry<T>(entries: T[], entryIndex: number): void {
-  const confirmed = window.confirm(
-    'Delete this entire entry? This will also delete its bullets.',
-  );
-
-  if (!confirmed) {
-    return;
+    bullets.push(this.createBullet(includeLabel, includeUrl));
+    this.scheduleAutoSave();
   }
 
-  entries.splice(entryIndex, 1);
-  this.scheduleAutoSave();
-}
+  deleteBullet(bullets: ResumeBullet[], bulletIndex: number): void {
+    const confirmed = window.confirm('Ar you sure you want to delete this bullet?');
+
+    if (!confirmed) {
+      return;
+    }
+
+    bullets.splice(bulletIndex, 1);
+    this.scheduleAutoSave();
+  }
+
+  addStandardEntry(section: EntriesSection): void {
+    section.entries.push({
+      id: `entry-${crypto.randomUUID()}`,
+      heading: '',
+      meta: '',
+      date: '',
+      bullets: [this.createBullet()],
+    });
+
+    this.scheduleAutoSave();
+  }
+
+  highlightElement(id: string): void {
+    this.activeElementId.set(id);
+  }
+
+  clearHighlight(): void {
+    this.activeElementId.set(null);
+  }
+
+  addOrganizationEntry(section: OrganizationEntriesSection): void {
+    section.entries.push({
+      id: `organization-entry-${crypto.randomUUID()}`,
+      org: '',
+      role: '',
+      location: '',
+      date: '',
+      bullets: [this.createBullet()],
+    });
+
+    this.scheduleAutoSave();
+  }
+
+  deleteEntry<T>(entries: T[], entryIndex: number): void {
+    const confirmed = window.confirm(
+      'Delete this entire entry? This will also delete its bullets.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    entries.splice(entryIndex, 1);
+    this.scheduleAutoSave();
+  }
 
   private performSave(): void {
     const currentResume = this.resume();
@@ -781,7 +811,10 @@ deleteEntry<T>(entries: T[], entryIndex: number): void {
       clearTimeout(this.autoSaveTimer);
     }
 
-    this.autoSaveTimer = setTimeout(() => {this.autoSaveTimer = null; this.performSave();}, 1500);
+    this.autoSaveTimer = setTimeout(() => {
+      this.autoSaveTimer = null;
+      this.performSave();
+    }, 1500);
   }
 
   ngOnDestroy(): void {
