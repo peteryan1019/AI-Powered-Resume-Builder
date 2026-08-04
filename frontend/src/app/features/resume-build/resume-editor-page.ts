@@ -149,7 +149,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                           [(ngModel)]="bullet.url"
                           (focus)="highlightElement(bullet.id)"
                           (blur)="clearHighlight()"
-                      <label/>
+                      </label>
                     </div>
 
                     <button
