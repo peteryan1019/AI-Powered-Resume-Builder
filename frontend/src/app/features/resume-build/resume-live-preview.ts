@@ -1,13 +1,26 @@
 import { CommonModule } from '@angular/common';
-import { Component, Input } from '@angular/core';
-import { ResumeContent } from '../../services/resume.service';
+import {
+  Component,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+  inject,
+  ElementRef,
+  EventEmitter,
+} from '@angular/core';
+import type { ResumeContent } from '../../services/resume.service';
 
 @Component({
   selector: 'app-resume-live-preview',
   standalone: true,
   imports: [CommonModule],
   template: `
-    <article class="resume-page" [ngClass]="'template-' + templateId">
+    <article
+      class="resume-page"
+      [ngClass]="'template-' + templateId"
+      (click)="selectFromPreview($event)"
+    >
       <header class="resume-header">
         <h1
           [attr.data-resume-id]="content.header.name.id"
@@ -246,10 +259,23 @@ import { ResumeContent } from '../../services/resume.service';
           outline 0.15s ease,
           background 0.15s ease;
       }
+
+      [data-resume-id] {
+        cursor: pointer;
+      }
+
+      [data-resume-id]:hover {
+        background: rgba(255, 225, 70, 0.16);
+      }
     `,
   ],
 })
-export class ResumeLivePreview {
+export class ResumeLivePreview implements OnChanges {
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+
+  @Output()
+  elementSelected = new EventEmitter<string>();
+
   @Input({ required: true })
   content!: ResumeContent;
 
@@ -258,6 +284,56 @@ export class ResumeLivePreview {
 
   @Input()
   activeElementId: string | null = null;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes['activeElementId'] && this.activeElementId) {
+      queueMicrotask(() => {
+        this.scrollToActiveElement();
+      });
+    }
+  }
+
+  private scrollToActiveElement(): void {
+    const id = this.activeElementId;
+
+    if (!id) {
+      return;
+    }
+
+    const container = this.host.nativeElement;
+
+    const element = Array.from(container.querySelectorAll<HTMLElement>('[data-resume-id]')).find(
+      (candidate) => candidate.dataset['resumeId'] === id,
+    );
+
+    if (!element) {
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+
+    const nextScrollTop =
+      container.scrollTop +
+      elementRect.top -
+      containerRect.top -
+      container.clientHeight / 2 +
+      element.clientHeight / 2;
+
+    container.scrollTo({ top: nextScrollTop, behavior: 'smooth' });
+  }
+
+  selectFromPreview(event: MouseEvent): void {
+    const clickedElement = event.target as HTMLElement;
+
+    const resumeElement = clickedElement.closest<HTMLElement>('[data-resume-id]');
+
+    const id = resumeElement?.dataset['resumeId'];
+
+    if (id) {
+      this.elementSelected.emit(id);
+    }
+  }
 
   isHighlighted(id: string): boolean {
     return this.activeElementId === id;

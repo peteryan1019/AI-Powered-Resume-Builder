@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, OnDestroy, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal, ElementRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
@@ -54,7 +54,11 @@ import { finalize, switchMap, tap } from 'rxjs';
 
               <label>
                 Job-post title
-                <input type="text" [(ngModel)]="loadedResume.content.jobPostTitle" />
+                <input
+                  type="text"
+                  [(ngModel)]="loadedResume.content.jobPostTitle"
+                  [attr.data-editor-id]="'job-post-title'"
+                />
               </label>
             </article>
 
@@ -66,6 +70,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                 <input
                   type="text"
                   [(ngModel)]="loadedResume.content.header.name.text"
+                  [attr.data-editor-id]="loadedResume.content.header.name.id"
                   (focus)="highlightElement(loadedResume.content.header.name.id)"
                   (blur)="clearHighlight()"
                 />
@@ -82,6 +87,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                   <input
                     type="text"
                     [(ngModel)]="part.text"
+                    [attr.data-editor-id]="part.id"
                     (focus)="highlightElement(part.id)"
                     (blur)="clearHighlight()"
                   />
@@ -89,7 +95,13 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                 <label *ngIf="part.href !== undefined">
                   Link
-                  <input type="text" [(ngModel)]="part.href" />
+                  <input
+                    type="text"
+                    [(ngModel)]="part.href"
+                    [attr.data-editor-id]="part.id"
+                    (focus)="highlightElement(part.id)"
+                    (blur)="clearHighlight()"
+                  />
                 </label>
               </div>
             </article>
@@ -101,6 +113,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                   <input
                     type="text"
                     [(ngModel)]="section.title"
+                    [attr.data-editor-id]="section.id"
                     (focus)="highlightElement(section.id)"
                     (blur)="clearHighlight()"
                   />
@@ -127,6 +140,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         <input
                           type="text"
                           [(ngModel)]="bullet.label"
+                          [attr.data-editor-id]="bullet.id"
                           (focus)="highlightElement(bullet.id)"
                           (blur)="clearHighlight()"
                         />
@@ -137,6 +151,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         <textarea
                           rows="3"
                           [(ngModel)]="bullet.text"
+                          [attr.data-editor-id]="bullet.id"
                           (focus)="highlightElement(bullet.id)"
                           (blur)="clearHighlight()"
                         ></textarea>
@@ -147,6 +162,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         <input
                           type="text"
                           [(ngModel)]="bullet.url"
+                          [attr.data-editor-id]="bullet.id"
                           (focus)="highlightElement(bullet.id)"
                           (blur)="clearHighlight()"
                         />
@@ -182,6 +198,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         <input
                           type="text"
                           [(ngModel)]="entry.heading"
+                          [attr.data-editor-id]="entry.id"
                           (focus)="highlightElement(entry.id)"
                           (blur)="clearHighlight()"
                         />
@@ -190,12 +207,24 @@ import { finalize, switchMap, tap } from 'rxjs';
                       <div class="two-columns">
                         <label>
                           Meta
-                          <input type="text" [(ngModel)]="entry.meta" />
+                          <input
+                            type="text"
+                            [(ngModel)]="entry.meta"
+                            [attr.data-editor-id]="entry.id"
+                            (focus)="highlightElement(entry.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
 
                         <label>
                           Date
-                          <input type="text" [(ngModel)]="entry.date" />
+                          <input
+                            type="text"
+                            [(ngModel)]="entry.date"
+                            [attr.data-editor-id]="entry.id"
+                            (focus)="highlightElement(entry.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
                       </div>
 
@@ -218,6 +247,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                           <textarea
                             rows="3"
                             [(ngModel)]="bullet.text"
+                            [attr.data-editor-id]="bullet.id"
                             (focus)="highlightElement(bullet.id)"
                             (blur)="clearHighlight()"
                           ></textarea>
@@ -256,22 +286,46 @@ import { finalize, switchMap, tap } from 'rxjs';
                       <div class="two-columns">
                         <label>
                           Organization
-                          <input type="text" [(ngModel)]="entry.org" />
+                          <input
+                            type="text"
+                            [(ngModel)]="entry.org"
+                            [attr.data-editor-id]="entry.id"
+                            (focus)="highlightElement(entry.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
 
                         <label>
                           Role
-                          <input type="text" [(ngModel)]="entry.role" />
+                          <input
+                            type="text"
+                            [(ngModel)]="entry.role"
+                            [attr.data-editor-id]="entry.id"
+                            (focus)="highlightElement(entry.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
 
                         <label>
                           Location
-                          <input type="text" [(ngModel)]="entry.location" />
+                          <input
+                            type="text"
+                            [(ngModel)]="entry.location"
+                            [attr.data-editor-id]="entry.id"
+                            (focus)="highlightElement(entry.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
 
                         <label>
                           Date
-                          <input type="text" [(ngModel)]="entry.date" />
+                          <input
+                            type="text"
+                            [(ngModel)]="entry.date"
+                            [attr.data-editor-id]="entry.id"
+                            (focus)="highlightElement(entry.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
                       </div>
 
@@ -294,6 +348,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                           <textarea
                             rows="3"
                             [(ngModel)]="bullet.text"
+                            [attr.data-editor-id]="bullet.id"
                             (focus)="highlightElement(bullet.id)"
                             (blur)="clearHighlight()"
                           ></textarea>
@@ -324,6 +379,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                       <input
                         type="text"
                         [(ngModel)]="section.school.text"
+                        [attr.data-editor-id]="section.school.id"
                         (focus)="highlightElement(section.school.id)"
                         (blur)="clearHighlight()"
                       />
@@ -348,6 +404,7 @@ import { finalize, switchMap, tap } from 'rxjs';
                         <textarea
                           rows="3"
                           [(ngModel)]="bullet.text"
+                          [attr.data-editor-id]="bullet.id"
                           (focus)="highlightElement(bullet.id)"
                           (blur)="clearHighlight()"
                         ></textarea>
@@ -371,6 +428,7 @@ import { finalize, switchMap, tap } from 'rxjs';
             [content]="loadedResume.content"
             [templateId]="loadedResume.templateId"
             [activeElementId]="activeElementId()"
+            (elementSelected)="focusEditorElement($event)"
           ></app-resume-live-preview>
         </aside>
       </div>
@@ -614,6 +672,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   private readonly auth = inject(AuthService);
   private readonly resumeService = inject(ResumeService);
   private readonly sanitizer = inject(DomSanitizer);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   private userId: string | null = null;
   private resumeId: string | null = null;
@@ -674,7 +733,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   }
 
   deleteBullet(bullets: ResumeBullet[], bulletIndex: number): void {
-    const confirmed = window.confirm('Ar you sure you want to delete this bullet?');
+    const confirmed = window.confirm('Are you sure you want to delete this bullet?');
 
     if (!confirmed) {
       return;
@@ -825,6 +884,24 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
       this.autoSaveTimer = null;
       this.performSave();
     }, 1500);
+  }
+
+  focusEditorElement(id: string): void {
+    const matches = Array.from(
+      this.host.nativeElement.querySelectorAll<HTMLElement>('[data-editor-id]'),
+    ).filter((candidate) => candidate.dataset['editorId'] === id);
+
+    const control = matches.find((candidate) => candidate.tagName === 'TEXTAREA') ?? matches[0];
+
+    if (!control) {
+      return;
+    }
+
+    this.highlightElement(id);
+
+    control.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    control.focus({ preventScroll: true });
   }
 
   ngOnDestroy(): void {
