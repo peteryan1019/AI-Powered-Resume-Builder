@@ -124,7 +124,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <label *ngIf="bullet.label !== undefined">
                         Label
-                        <input type="text" [(ngModel)]="bullet.label" />
+                        <input
+                          type="text"
+                          [(ngModel)]="bullet.label"
+                          (focus)="highlightElement(bullet.id)"
+                          (blur)="clearHighlight()"
+                        />
                       </label>
 
                       <label>
@@ -139,8 +144,12 @@ import { finalize, switchMap, tap } from 'rxjs';
 
                       <label *ngIf="bullet.url !== undefined">
                         URL
-                        <input type="text" [(ngModel)]="bullet.url" />
-                      </label>
+                        <input
+                          type="text"
+                          [(ngModel)]="bullet.url"
+                          (focus)="highlightElement(bullet.id)"
+                          (blur)="clearHighlight()"
+                        />
                     </div>
 
                     <button
@@ -369,7 +378,7 @@ import { finalize, switchMap, tap } from 'rxjs';
   styles: [
     `
       .editor-page {
-        max-width: 95rem;
+        max-width: 120rem;
         margin: 0 auto;
         padding: 3rem 1.5rem;
         color: #f4f6ff;
@@ -559,8 +568,8 @@ import { finalize, switchMap, tap } from 'rxjs';
       .editor-workspace {
         display: grid;
         grid-template-columns:
-          minmax(0, 1fr)
-          minmax(26rem, 0.9fr);
+          minmax(22rem, 0.75fr)
+          minmax(42rem, 1.25fr);
         align-items: start;
         gap: 1.5rem;
       }
@@ -587,7 +596,7 @@ import { finalize, switchMap, tap } from 'rxjs';
         background: white;
       }
 
-      @media (max-width: 900px) {
+      @media (max-width: 1100px) {
         .editor-workspace {
           grid-template-columns: 1fr;
         }

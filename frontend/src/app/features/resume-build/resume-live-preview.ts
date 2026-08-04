@@ -149,13 +149,13 @@ import { ResumeContent } from '../../services/resume.service';
         --resume-accent: #174785;
         box-sizing: border-box;
         width: 100%;
-        min-height: 100%;
-        padding: 2.5rem;
+        aspect-ratio: 8.5 / 11;
+        padding: 6% 7%;
         background: #fff;
         color: #111;
         font-family: Arial, Helvetica, sans-serif;
-        font-size: 0.78rem;
-        line-height: 1.35;
+        font-size: 0.72rem;
+        line-height: 1.3;
       }
 
       .template-signal {
@@ -171,12 +171,15 @@ import { ResumeContent } from '../../services/resume.service';
       }
 
       .resume-header {
-        margin-bottom: 1rem;
-        text-align: center;
+        margin-bottom: 1.25rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid var(--resume-accent);
+        text-align: left;
       }
 
       .resume-header h1 {
-        margin: 0 0 0.35rem;
+        margin: 0 0 0.25rem;
+        color: var(--resume-accent);
         font-size: 1.45rem;
       }
 
@@ -184,7 +187,8 @@ import { ResumeContent } from '../../services/resume.service';
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 0.35rem 0.8rem;
+        gap: 0.25rem 0.65rem;
+        font-size: 0.68rem;
       }
 
       a {
@@ -233,11 +237,11 @@ import { ResumeContent } from '../../services/resume.service';
       }
 
       .edit-highlight {
-        outline: 2px solid rgba(140, 0, 255, 0.75);
+        outline: 2px solid rgba(231, 170, 0, 0.75);
         outline-offset: 2px;
         border-radius: 0.15rem;
-        background: rgba(140, 0, 255, 0.12);
-        box-shadow: 0 0 0.7rem rgba(140, 0, 255, 0.18);
+        background: rgba(255, 225, 70, 0.35);
+        box-shadow: 0 0 0.7rem rgba(255, 193, 7, 0.25);
         transition:
           outline 0.15s ease,
           background 0.15s ease;
