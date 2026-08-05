@@ -24,7 +24,7 @@
         <button
           type="button"
           class="secondary-action"
-          (click)="startCheckout('view_templates', '/resume-templates')"
+          routerLink="/resume-templates"
         >
           Browse templates
         </button>
@@ -61,7 +61,7 @@
       </div>
 
       <div class="template-footer">
-        <button type="button" (click)="startCheckout('view_templates', '/resume-templates')">
+        <button type="button" routerLink="/resume-templates">
           Choose a different template
         </button>
         <span>Selection syncs across the app.</span>

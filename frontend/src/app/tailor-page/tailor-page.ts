@@ -1,7 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../features/auth/auth.service';
 import { PaymentService } from '../features/payments/payment.service';
 import { ResumeTemplateService } from '../features/template-selection/resume-template.service';
@@ -10,7 +10,7 @@ import { ResumeBuildService } from '../features/resume-build/resume-build.servic
 @Component({
   selector: 'app-tailor-page',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './tailor-page.html',
   styleUrl: './tailor-page.scss',
 })

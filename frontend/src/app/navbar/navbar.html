@@ -4,7 +4,7 @@
     <span class="brand-name">Tailr</span>
   </a>
 
-  <div class="nav-center" *ngIf="auth.isAuthenticated()">
+  <div class="nav-center">
     <ul class="nav-links">
       <li>
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
@@ -37,15 +37,15 @@
       <li>
         <button
           type="button"
+          routerLink="/resume-templates"
           [class.active]="isRouteActive('/resume-templates')"
           [attr.aria-current]="isRouteActive('/resume-templates') ? 'page' : null"
-          (click)="startCheckout('view_templates', '/resume-templates')"
         >
           Resume templates
         </button>
       </li>
 
-      <li>
+      <li *ngIf="auth.isAuthenticated()">
         <a routerLink="/my-resumes" routerLinkActive="active"> My resumes </a>
       </li>
     </ul>
@@ -65,8 +65,7 @@
     </ng-container>
 
     <ng-template #loggedOutState>
-      <a class="auth-btn ghost link-button" routerLink="/login">Sign in</a>
-      <a class="auth-btn solid link-button" routerLink="/signup">Sign up</a>
+      <a class="auth-btn outline link-button" routerLink="/login">Continue with email</a>
 
       <button type="button" class="google-auth-button" (click)="googleLogin()">
         <svg class="google-auth-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">

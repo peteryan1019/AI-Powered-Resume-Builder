@@ -1,92 +1,66 @@
-<section class="auth-page">
-    <div class="auth-shell">
-        <div class="auth-intro">
-            <p class="eyebrow">Access</p>
-            <h1>{{ title() }}</h1>
-            <p class="intro-copy">{{ copy() }}</p>
+<div class="auth-overlay" (click)="onBackdrop($event)">
+  <div class="auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <button type="button" class="auth-close" (click)="close()" aria-label="Close">
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    </button>
 
-            <div class="feature-list">
-                <div class="feature-pill">
-                    <span class="dot"></span>
-                    <span>Google is a single click</span>
-                </div>
-                <div class="feature-pill">
-                    <span class="dot"></span>
-                    <span>Or a one-time email code — no password</span>
-                </div>
-                <div class="feature-pill">
-                    <span class="dot"></span>
-                    <span>Session persists after sign in</span>
-                </div>
-            </div>
-
-            <!-- google icon for login -->
-            <button type="button" class="google-auth-button" (click)="googleLogin()">
-                <svg class="google-auth-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-                    <path fill="#EA4335"
-                        d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
-                    <path fill="#4285F4"
-                        d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
-                    <path fill="#FBBC05"
-                        d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
-                    <path fill="#34A853"
-                        d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
-                    <path fill="none" d="M0 0h48v48H0z" />
-                </svg>
-
-                <span>Continue with Google</span>
-            </button>
-
-            <p class="helper-copy">The Google flow is enough on its own. Use the form on the right for a
-                passwordless email code.</p>
-        </div>
-
-        <!-- Step 1: request a code -->
-        <form class="auth-card" *ngIf="phase() === 'email'" [formGroup]="emailForm" (ngSubmit)="submitEmail()">
-            <div class="card-heading">
-                <p class="eyebrow">Sign in</p>
-                <h2>Email me a code</h2>
-            </div>
-
-            <label class="field">
-                <span>Email</span>
-                <input type="email" formControlName="email" placeholder="avery@example.com" autocomplete="email" />
-            </label>
-
-            <button type="submit" class="submit-button" [disabled]="isSubmitting()">
-                {{ isSubmitting() ? 'Sending…' : 'Send code' }}
-            </button>
-
-            <p class="status" [class.status--error]="statusKind() === 'error'" *ngIf="statusMessage()">{{ statusMessage() }}</p>
-
-            <div class="card-footer">
-                <a routerLink="/resume-templates">Browse templates first</a>
-            </div>
-        </form>
-
-        <!-- Step 2: enter the code -->
-        <form class="auth-card" *ngIf="phase() === 'code'" [formGroup]="codeForm" (ngSubmit)="submitCode()">
-            <div class="card-heading">
-                <p class="eyebrow">Sign in</p>
-                <h2>Enter your code</h2>
-            </div>
-
-            <label class="field">
-                <span>6-digit code</span>
-                <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
-                    class="code-input" formControlName="code" placeholder="000000" />
-            </label>
-
-            <button type="submit" class="submit-button" [disabled]="isSubmitting()">
-                {{ isSubmitting() ? 'Verifying…' : 'Verify & sign in' }}
-            </button>
-
-            <p class="status" [class.status--error]="statusKind() === 'error'" *ngIf="statusMessage()">{{ statusMessage() }}</p>
-
-            <div class="card-footer">
-                <a href="javascript:void(0)" (click)="submitEmail()">Resend code</a>
-                <a href="javascript:void(0)" (click)="useDifferentEmail()">Use a different email</a>
-            </div>
-        </form>
+    <div class="modal-head">
+      <p class="eyebrow">Access</p>
+      <h2 id="auth-modal-title">{{ title() }}</h2>
+      <p class="modal-copy">{{ copy() }}</p>
     </div>
-</section>
+
+    <!-- Step 1: request a code -->
+    <form *ngIf="phase() === 'email'" [formGroup]="emailForm" (ngSubmit)="submitEmail()">
+      <label class="field">
+        <span>Email</span>
+        <input type="email" formControlName="email" placeholder="avery@example.com" autocomplete="email" />
+      </label>
+
+      <button type="submit" class="submit-button" [disabled]="isSubmitting()">
+        {{ isSubmitting() ? 'Sending…' : 'Send code' }}
+      </button>
+
+      <p class="status" [class.status--error]="statusKind() === 'error'" *ngIf="statusMessage()">{{ statusMessage() }}</p>
+    </form>
+
+    <!-- Step 2: enter the code -->
+    <form *ngIf="phase() === 'code'" [formGroup]="codeForm" (ngSubmit)="submitCode()">
+      <label class="field">
+        <span>6-digit code</span>
+        <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+          class="code-input" formControlName="code" placeholder="000000" />
+      </label>
+
+      <button type="submit" class="submit-button" [disabled]="isSubmitting()">
+        {{ isSubmitting() ? 'Verifying…' : 'Verify & sign in' }}
+      </button>
+
+      <p class="status" [class.status--error]="statusKind() === 'error'" *ngIf="statusMessage()">{{ statusMessage() }}</p>
+
+      <div class="alt-actions">
+        <a href="javascript:void(0)" (click)="submitEmail()">Resend code</a>
+        <a href="javascript:void(0)" (click)="useDifferentEmail()">Use a different email</a>
+      </div>
+    </form>
+
+    <div class="divider"><span>or</span></div>
+
+    <button type="button" class="google-auth-button" (click)="googleLogin()">
+      <svg class="google-auth-icon" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+        <path fill="#EA4335"
+          d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
+        <path fill="#4285F4"
+          d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z" />
+        <path fill="#FBBC05"
+          d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z" />
+        <path fill="#34A853"
+          d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z" />
+        <path fill="none" d="M0 0h48v48H0z" />
+      </svg>
+      <span>Continue with Google</span>
+    </button>
+  </div>
+</div>

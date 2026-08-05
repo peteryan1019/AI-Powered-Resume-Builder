@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 
 import { AuthService } from '../features/auth/auth.service';
@@ -11,9 +11,10 @@ type Phase = 'email' | 'code';
 @Component({
   selector: 'app-auth-page',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule],
   templateUrl: './auth-page.html',
   styleUrl: './auth-page.scss',
+  host: { '(document:keydown.escape)': 'close()' },
 })
 export class AuthPage {
   private readonly route = inject(ActivatedRoute);
@@ -110,6 +111,20 @@ export class AuthPage {
 
   googleLogin(): void {
     this.auth.signInWithGoogle(this.returnUrl, this.checkoutAction ?? undefined);
+  }
+
+  // Dismiss the modal. Go to the public home page — NOT returnUrl, which is
+  // usually a guarded route (e.g. /profile) that would bounce a logged-out user
+  // straight back to login with a 401.
+  close(): void {
+    void this.router.navigateByUrl('/');
+  }
+
+  // Close only when the backdrop itself is clicked, not the card inside it.
+  onBackdrop(event: MouseEvent): void {
+    if (event.target === event.currentTarget) {
+      this.close();
+    }
   }
 
   private continueAfterAuth(): void {

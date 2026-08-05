@@ -29,6 +29,6 @@ export const routes: Routes = [
   { path: 'tailor/result/:jobId', component: BuildResultPage, canActivate: [authGuard, paymentGuard] },
   { path: 'my-resumes/:resumeId/edit', component: ResumeEditorPage, canActivate: [authGuard] },
   { path: 'my-resumes', component: MyResumesPage, canActivate: [authGuard] },
-  { path: 'resume-templates', component: ResumeTemplatesPage, canActivate: [authGuard, paymentGuard] },
+  { path: 'resume-templates', component: ResumeTemplatesPage, canActivate: [] },
   { path: '**', redirectTo: '' },
 ];
