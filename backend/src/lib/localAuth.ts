@@ -112,6 +112,12 @@ export async function signupLocalUser(input: {
     throw new LocalAuthError('Email and password are required.', 400, 'missing_fields');
   }
 
+  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new LocalAuthError("Please enter a valid email address.", 400, "invalid_email");
+  }
+
   const passwordHash = await hashPassword(password);
 
   return prisma.$transaction(async (tx) => {

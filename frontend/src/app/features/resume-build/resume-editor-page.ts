@@ -127,6 +127,28 @@ import { finalize, switchMap, tap } from 'rxjs';
                     >
                       <button
                         type="button"
+                        class="reorder-button move-up"
+                        [disabled]="bulletIndex === 0"
+                        (click)="moveItem(section.bullets, bulletIndex, -1)"
+                        aria-label="Move bullet up"
+                        title="Move bullet up"
+                      >
+                        <span aria-hidden="true">↑</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="reorder-button move-down"
+                        [disabled]="bulletIndex === section.bullets.length - 1"
+                        (click)="moveItem(section.bullets, bulletIndex, 1)"
+                        aria-label="Move bullet down"
+                        title="Move bullet down"
+                      >
+                        <span aria-hidden="true">↓</span>
+                      </button>
+
+                      <button
+                        type="button"
                         class="delete-button"
                         (click)="deleteBullet(section.bullets, bulletIndex)"
                         aria-label="Delete bullet"
@@ -185,6 +207,28 @@ import { finalize, switchMap, tap } from 'rxjs';
                     >
                       <button
                         type="button"
+                        class="reorder-button move-up"
+                        [disabled]="entryIndex === 0"
+                        (click)="moveItem(section.entries, entryIndex, -1)"
+                        aria-label="Move entry up"
+                        title="Move entry up"
+                      >
+                        <span aria-hidden="true">↑</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="reorder-button move-down"
+                        [disabled]="entryIndex === section.entries.length - 1"
+                        (click)="moveItem(section.entries, entryIndex, 1)"
+                        aria-label="Move entry down"
+                        title="Move entry down"
+                      >
+                        <span aria-hidden="true">↓</span>
+                      </button>
+
+                      <button
+                        type="button"
                         class="delete-button"
                         (click)="deleteEntry(section.entries, entryIndex)"
                         aria-label="Delete entry"
@@ -234,6 +278,28 @@ import { finalize, switchMap, tap } from 'rxjs';
                       >
                         <button
                           type="button"
+                          class="reorder-button move-up"
+                          [disabled]="bulletIndex === 0"
+                          (click)="moveItem(entry.bullets, bulletIndex, -1)"
+                          aria-label="Move bullet up"
+                          title="Move bullet up"
+                        >
+                          <span aria-hidden="true">↑</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          class="reorder-button move-down"
+                          [disabled]="bulletIndex === entry.bullets.length - 1"
+                          (click)="moveItem(entry.bullets, bulletIndex, 1)"
+                          aria-label="Move bullet down"
+                          title="Move bullet down"
+                        >
+                          <span aria-hidden="true">↓</span>
+                        </button>
+
+                        <button
+                          type="button"
                           class="delete-button"
                           (click)="deleteBullet(entry.bullets, bulletIndex)"
                           aria-label="Delete bullet"
@@ -273,6 +339,28 @@ import { finalize, switchMap, tap } from 'rxjs';
                       class="entry-card"
                       *ngFor="let entry of section.entries; let entryIndex = index"
                     >
+                      <button
+                        type="button"
+                        class="reorder-button move-up"
+                        [disabled]="entryIndex === 0"
+                        (click)="moveItem(section.entries, entryIndex, -1)"
+                        aria-label="Move experience up"
+                        title="Move experience up"
+                      >
+                        <span aria-hidden="true">↑</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="reorder-button move-down"
+                        [disabled]="entryIndex === section.entries.length - 1"
+                        (click)="moveItem(section.entries, entryIndex, 1)"
+                        aria-label="Move experience down"
+                        title="Move experience down"
+                      >
+                        <span aria-hidden="true">↓</span>
+                      </button>
+
                       <button
                         type="button"
                         class="delete-button"
@@ -335,6 +423,28 @@ import { finalize, switchMap, tap } from 'rxjs';
                       >
                         <button
                           type="button"
+                          class="reorder-button move-up"
+                          [disabled]="bulletIndex === 0"
+                          (click)="moveItem(entry.bullets, bulletIndex, -1)"
+                          aria-label="Move bullet up"
+                          title="Move bullet up"
+                        >
+                          <span aria-hidden="true">↑</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          class="reorder-button move-down"
+                          [disabled]="bulletIndex === entry.bullets.length - 1"
+                          (click)="moveItem(entry.bullets, bulletIndex, 1)"
+                          aria-label="Move bullet down"
+                          title="Move bullet down"
+                        >
+                          <span aria-hidden="true">↓</span>
+                        </button>
+
+                        <button
+                          type="button"
                           class="delete-button"
                           (click)="deleteBullet(entry.bullets, bulletIndex)"
                           aria-label="Delete bullet"
@@ -389,6 +499,28 @@ import { finalize, switchMap, tap } from 'rxjs';
                       class="item-card"
                       *ngFor="let bullet of section.bullets; let bulletIndex = index"
                     >
+                      <button
+                        type="button"
+                        class="reorder-button move-up"
+                        [disabled]="bulletIndex === 0"
+                        (click)="moveItem(section.bullets, bulletIndex, -1)"
+                        aria-label="Move bullet up"
+                        title="Move bullet up"
+                      >
+                        <span aria-hidden="true">↑</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        class="reorder-button move-down"
+                        [disabled]="bulletIndex === section.bullets.length - 1"
+                        (click)="moveItem(section.bullets, bulletIndex, 1)"
+                        aria-label="Move bullet down"
+                        title="Move bullet down"
+                      >
+                        <span aria-hidden="true">↓</span>
+                      </button>
+
                       <button
                         type="button"
                         class="delete-button"
@@ -488,7 +620,7 @@ import { finalize, switchMap, tap } from 'rxjs';
         display: grid;
         gap: 0.8rem;
         padding: 1rem;
-        padding-right: 3.25rem;
+        padding-right: 8rem;
         border-radius: 0.75rem;
         background: rgba(255, 255, 255, 0.04);
       }
@@ -502,6 +634,7 @@ import { finalize, switchMap, tap } from 'rxjs';
       }
 
       .add-button,
+      .reorder-button,
       .delete-button {
         color: #fff;
         font: inherit;
@@ -545,6 +678,40 @@ import { finalize, switchMap, tap } from 'rxjs';
         color: #ffb3b3;
         font-size: 1.25rem;
         line-height: 1;
+      }
+
+      .reorder-button {
+        position: absolute;
+        top: 0.7rem;
+        display: grid;
+        width: 2rem;
+        height: 2rem;
+        padding: 0;
+        place-items: center;
+        border: 1px solid rgba(122, 97, 255, 0.48);
+        border-radius: 50%;
+        background: rgba(122, 97, 255, 0.14);
+        color: #d9d2ff;
+        font-size: 1.1rem;
+        line-height: 1;
+      }
+
+      .reorder-button.move-up {
+        right: 5.3rem;
+      }
+
+      .reorder-button.move-down {
+        right: 3rem;
+      }
+
+      .reorder-button:hover:not(:disabled) {
+        background: rgba(122, 97, 255, 0.32);
+        transform: translateY(-1px);
+      }
+
+      .reorder-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.28;
       }
 
       .delete-button:hover {
@@ -786,6 +953,18 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
     }
 
     entries.splice(entryIndex, 1);
+    this.scheduleAutoSave();
+  }
+
+  moveItem<T>(items: T[], currentIndex: number, direction: -1 | 1): void {
+    const destinationIndex = currentIndex + direction;
+
+    if (destinationIndex < 0 || destinationIndex >= items.length) {
+      return;
+    }
+
+    items.splice(destinationIndex, 0, ...items.splice(currentIndex, 1));
+
     this.scheduleAutoSave();
   }
 
