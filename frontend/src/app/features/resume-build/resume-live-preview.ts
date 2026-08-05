@@ -733,25 +733,25 @@ export class ResumeLivePreview implements OnChanges {
   @Input()
   activeElementId: string | null = null;
 
+  @Input()
+  additionalHighlightedIds: readonly string[] = [];
+
   get templateClass(): string {
     return `template-${this.templateId.trim().toLowerCase()}`;
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['activeElementId'] && this.activeElementId) {
+    const shouldScroll = changes['activeElementId'] || changes['additionalHighlightedIds'];
+    const scrollTarget = this.activeElementId ?? this.additionalHighlightedIds[0] ?? null;
+
+    if (shouldScroll && scrollTarget) {
       queueMicrotask(() => {
-        this.scrollToActiveElement();
+        this.scrollToElement(scrollTarget);
       });
     }
   }
 
-  private scrollToActiveElement(): void {
-    const id = this.activeElementId;
-
-    if (!id) {
-      return;
-    }
-
+  private scrollToElement(id: string): void {
     const container = this.host.nativeElement;
 
     const element = Array.from(container.querySelectorAll<HTMLElement>('[data-resume-id]')).find(
@@ -786,6 +786,6 @@ export class ResumeLivePreview implements OnChanges {
   }
 
   isHighlighted(id: string): boolean {
-    return this.activeElementId === id;
+    return this.activeElementId === id || this.additionalHighlightedIds.includes(id);
   }
 }

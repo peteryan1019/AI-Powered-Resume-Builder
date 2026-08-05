@@ -560,6 +560,7 @@ import { finalize, switchMap, tap } from 'rxjs';
             [content]="loadedResume.content"
             [templateId]="loadedResume.templateId"
             [activeElementId]="activeElementId()"
+            [additionalHighlightedIds]="swapElementIds()"
             (elementSelected)="focusEditorElement($event)"
           ></app-resume-live-preview>
         </aside>
@@ -619,8 +620,7 @@ import { finalize, switchMap, tap } from 'rxjs';
         position: relative;
         display: grid;
         gap: 0.8rem;
-        padding: 1rem;
-        padding-right: 8rem;
+        padding: 3.75rem 1rem 1rem;
         border-radius: 0.75rem;
         background: rgba(255, 255, 255, 0.04);
       }
@@ -747,6 +747,7 @@ import { finalize, switchMap, tap } from 'rxjs';
       }
 
       textarea {
+        min-height: 6.5rem;
         resize: vertical;
       }
 
@@ -844,6 +845,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   private userId: string | null = null;
   private resumeId: string | null = null;
   private autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+  private swapHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   private save = false;
 
   readonly dirty = signal(false);
@@ -854,6 +856,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   readonly pdfURL = signal<SafeResourceUrl | null>(null);
   readonly resume = signal<EditableResumeResponse['resume'] | null>(null);
   readonly activeElementId = signal<string | null>(null);
+  readonly swapElementIds = signal<readonly string[]>([]);
 
   ngOnInit(): void {
     this.userId = this.auth.user()?.id ?? null;
@@ -918,7 +921,6 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
       date: '',
       bullets: [this.createBullet()],
     });
-
     this.scheduleAutoSave();
   }
 
@@ -939,7 +941,6 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
       date: '',
       bullets: [this.createBullet()],
     });
-
     this.scheduleAutoSave();
   }
 
@@ -956,16 +957,36 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
     this.scheduleAutoSave();
   }
 
-  moveItem<T>(items: T[], currentIndex: number, direction: -1 | 1): void {
+  moveItem<T extends { id: string }>(items: T[], currentIndex: number, direction: -1 | 1): void {
     const destinationIndex = currentIndex + direction;
 
     if (destinationIndex < 0 || destinationIndex >= items.length) {
       return;
     }
 
+    const movingItem = items[currentIndex];
+    const displacedItem = items[destinationIndex];
+
+    if (!movingItem || !displacedItem) {
+      return;
+    }
+
     items.splice(destinationIndex, 0, ...items.splice(currentIndex, 1));
+    this.showSwapHighlight(movingItem.id, displacedItem.id);
 
     this.scheduleAutoSave();
+  }
+
+  private showSwapHighlight(firstId: string, secondId: string): void {
+    if (this.swapHighlightTimer) {
+      clearTimeout(this.swapHighlightTimer);
+    }
+
+    this.swapElementIds.set([firstId, secondId]);
+    this.swapHighlightTimer = setTimeout(() => {
+      this.swapElementIds.set([]);
+      this.swapHighlightTimer = null;
+    }, 1500);
   }
 
   private performSave(): void {
@@ -1086,6 +1107,10 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     if (this.autoSaveTimer) {
       clearTimeout(this.autoSaveTimer);
+    }
+
+    if (this.swapHighlightTimer) {
+      clearTimeout(this.swapHighlightTimer);
     }
   }
 }
