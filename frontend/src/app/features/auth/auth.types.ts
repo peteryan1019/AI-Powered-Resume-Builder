@@ -8,11 +8,3 @@ export interface AuthUser {
   updatedAt: string;
 }
 
-export interface AuthCredentials {
-  email: string;
-  password: string;
-}
-
-export interface SignupCredentials extends AuthCredentials {
-  name: string;
-}

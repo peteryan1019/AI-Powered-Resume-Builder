@@ -1,0 +1,80 @@
+name: CI
+
+# Runs on every pull request, and is called by the two deploy workflows before
+# they build or ship anything (see `uses: ./.github/workflows/ci.yml`).
+#
+# Every suite here is deliberately free of external dependencies — no database,
+# no API keys, no network — so CI needs no secrets and cannot fail for reasons
+# unrelated to the code.
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  frontend:
+    name: Frontend unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+  backend:
+    name: Backend unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # generated/prisma is not committed, and the Prisma client's types are
+      # imported across the codebase.
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run tests
+        run: npm test
+
+  generators:
+    name: PDF generator smoke tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: assets/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r assets/requirements.txt
+
+      # Renders every template from a fixture and asserts the result is a valid
+      # one-page PDF — including the degenerate inputs the JSON schema allows.
+      - name: Run generator tests
+        run: python -m unittest discover -s assets/templates -p "test_*.py" -v

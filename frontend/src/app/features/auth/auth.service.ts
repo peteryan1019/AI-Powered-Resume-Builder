@@ -2,7 +2,7 @@ import { Injectable, computed, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, catchError, map, of, tap, throwError } from 'rxjs';
 
-import { AuthCredentials, AuthUser, SignupCredentials } from './auth.types';
+import { AuthUser } from './auth.types';
 
 const AUTH_API = '/auth';
 
@@ -46,18 +46,19 @@ export class AuthService {
     window.location.assign(`${AUTH_API}/google${query ? `?${query}` : ''}`);
   }
 
-  signIn(credentials: AuthCredentials): Observable<AuthUser> {
+  // Passwordless local auth. Step 1: ask for a one-time code by email. Returns
+  // the neutral confirmation message (never reveals whether the email exists).
+  requestCode(email: string): Observable<string> {
     return this.http
-      .post<{ user: AuthUser }>(`${AUTH_API}/local/login`, credentials, { withCredentials: true })
-      .pipe(
-        tap(({ user }) => this.userSignal.set(user)),
-        map(({ user }) => user)
-      );
+      .post<{ message: string }>(`${AUTH_API}/local/request-code`, { email }, { withCredentials: true })
+      .pipe(map(({ message }) => message));
   }
 
-  signUp(credentials: SignupCredentials): Observable<AuthUser> {
+  // Step 2: verify the code. On success the session is established and the user
+  // is returned (account is created on first successful verification).
+  verifyCode(email: string, code: string): Observable<AuthUser> {
     return this.http
-      .post<{ user: AuthUser }>(`${AUTH_API}/local/signup`, credentials, { withCredentials: true })
+      .post<{ user: AuthUser }>(`${AUTH_API}/local/verify-code`, { email, code }, { withCredentials: true })
       .pipe(
         tap(({ user }) => this.userSignal.set(user)),
         map(({ user }) => user)

@@ -71,6 +71,9 @@ enum PaymentStatus {
   CANCELED
 }
 
+// DEPRECATED: local auth is now passwordless (email OTP), so no new rows are
+// written here. Kept only to avoid a destructive drop of any existing data;
+// safe to remove in a later dedicated migration once confirmed empty.
 model LocalAuthCredential {
   id           String   @id @default(uuid())
   userId       String   @unique
@@ -79,6 +82,24 @@ model LocalAuthCredential {
   updatedAt    DateTime @default(now()) @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// EMAIL LOGIN CODE (passwordless OTP)
+// One-time 6-digit code emailed to prove inbox ownership. The email address is
+// the identity: verifying a code creates the account on first use, or logs in
+// an existing one — so Google and email users converge on the same account and
+// there are no passwords to store or hijack.
+// One active code per email (upserted on re-request). codeHash = sha256 of the
+// code; the raw code is never stored. `attempts` caps guessing.
+// ─────────────────────────────────────────
+model EmailLoginCode {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
 }
 
 // ─────────────────────────────────────────

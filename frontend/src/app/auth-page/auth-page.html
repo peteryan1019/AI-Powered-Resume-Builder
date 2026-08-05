@@ -12,7 +12,7 @@
                 </div>
                 <div class="feature-pill">
                     <span class="dot"></span>
-                    <span>Email/password stays available</span>
+                    <span>Or a one-time email code — no password</span>
                 </div>
                 <div class="feature-pill">
                     <span class="dot"></span>
@@ -37,40 +37,55 @@
                 <span>Continue with Google</span>
             </button>
 
-            <p class="helper-copy">The Google flow is enough on its own. Use the form on the right if you want a regular
-                account.</p>
+            <p class="helper-copy">The Google flow is enough on its own. Use the form on the right for a
+                passwordless email code.</p>
         </div>
 
-        <form class="auth-card" [formGroup]="form" (ngSubmit)="submit()">
+        <!-- Step 1: request a code -->
+        <form class="auth-card" *ngIf="phase() === 'email'" [formGroup]="emailForm" (ngSubmit)="submitEmail()">
             <div class="card-heading">
-                <p class="eyebrow">{{ isSignup ? 'Create account' : 'Sign in' }}</p>
-                <h2>{{ submitLabel() }}</h2>
+                <p class="eyebrow">Sign in</p>
+                <h2>Email me a code</h2>
             </div>
-
-            <label class="field" *ngIf="isSignup">
-                <span>Name</span>
-                <input type="text" formControlName="name" placeholder="Avery Chen" />
-            </label>
 
             <label class="field">
                 <span>Email</span>
-                <input type="email" formControlName="email" placeholder="avery@example.com" />
-            </label>
-
-            <label class="field">
-                <span>Password</span>
-                <input type="password" formControlName="password" placeholder="At least 8 characters" />
+                <input type="email" formControlName="email" placeholder="avery@example.com" autocomplete="email" />
             </label>
 
             <button type="submit" class="submit-button" [disabled]="isSubmitting()">
-                {{ isSubmitting() ? 'Working…' : submitLabel() }}
+                {{ isSubmitting() ? 'Sending…' : 'Send code' }}
             </button>
 
-            <p class="status" *ngIf="statusMessage()">{{ statusMessage() }}</p>
+            <p class="status" [class.status--error]="statusKind() === 'error'" *ngIf="statusMessage()">{{ statusMessage() }}</p>
 
             <div class="card-footer">
-                <a [routerLink]="switchRoute()" [queryParams]="switchQueryParams()">{{ switchLabel() }}</a>
                 <a routerLink="/resume-templates">Browse templates first</a>
+            </div>
+        </form>
+
+        <!-- Step 2: enter the code -->
+        <form class="auth-card" *ngIf="phase() === 'code'" [formGroup]="codeForm" (ngSubmit)="submitCode()">
+            <div class="card-heading">
+                <p class="eyebrow">Sign in</p>
+                <h2>Enter your code</h2>
+            </div>
+
+            <label class="field">
+                <span>6-digit code</span>
+                <input type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6"
+                    class="code-input" formControlName="code" placeholder="000000" />
+            </label>
+
+            <button type="submit" class="submit-button" [disabled]="isSubmitting()">
+                {{ isSubmitting() ? 'Verifying…' : 'Verify & sign in' }}
+            </button>
+
+            <p class="status" [class.status--error]="statusKind() === 'error'" *ngIf="statusMessage()">{{ statusMessage() }}</p>
+
+            <div class="card-footer">
+                <a href="javascript:void(0)" (click)="submitEmail()">Resend code</a>
+                <a href="javascript:void(0)" (click)="useDifferentEmail()">Use a different email</a>
             </div>
         </form>
     </div>

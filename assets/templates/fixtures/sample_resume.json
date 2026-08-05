@@ -1,0 +1,92 @@
+{
+  "jobPostTitle": "Backend Engineer",
+  "header": {
+    "name": { "id": "header-name", "text": "Dana Okafor" },
+    "contact": {
+      "id": "header-contact-line",
+      "parts": [
+        { "id": "contact-phone", "text": "647-555-0142" },
+        { "id": "contact-email", "text": "dana@example.com", "href": "mailto:dana@example.com" },
+        { "id": "contact-linkedin", "text": "LinkedIn", "href": "https://linkedin.com/in/danaokafor" },
+        { "id": "contact-github", "text": "GitHub", "href": "https://github.com/danaokafor" }
+      ]
+    }
+  },
+  "sections": [
+    {
+      "id": "section-technical-skills",
+      "title": "TECHNICAL SKILLS",
+      "type": "bullets",
+      "bullets": [
+        { "id": "skill-lang", "label": "Languages:", "text": "Python, Go, TypeScript, SQL, Bash." },
+        { "id": "skill-infra", "label": "Infrastructure:", "text": "Docker, Kubernetes, Terraform, AWS, GitHub Actions." },
+        { "id": "skill-data", "label": "Data:", "text": "PostgreSQL, Redis, Kafka, Spark." }
+      ]
+    },
+    {
+      "id": "section-projects",
+      "title": "PROJECTS",
+      "type": "entries",
+      "entries": [
+        {
+          "id": "proj-fraud",
+          "heading": "Real-Time Fraud Detection Pipeline",
+          "meta": "Python, Kafka, Spark Streaming, XGBoost",
+          "date": "Mar 2025",
+          "bullets": [
+            { "id": "b-fraud-1", "text": "Built a streaming pipeline ingesting 50,000 transactions per minute with sub-second fraud flagging." },
+            { "id": "b-fraud-2", "text": "Reduced false-positive alerts by 38% through velocity and geolocation features." }
+          ]
+        },
+        {
+          "id": "proj-scheduler",
+          "heading": "Course Scheduler REST API",
+          "meta": "Python, FastAPI, PostgreSQL, Redis",
+          "date": "Sep - Dec 2024",
+          "bullets": [
+            { "id": "b-sched-1", "text": "Designed a REST API resolving timetable conflicts across 500+ course sections." },
+            { "id": "b-sched-2", "label": "Source:", "text": "", "url": "https://github.com/danaokafor/scheduler" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "section-professional-experiences",
+      "title": "PROFESSIONAL EXPERIENCE",
+      "type": "org_entries",
+      "entries": [
+        {
+          "id": "exp-shopify",
+          "org": "Shopify",
+          "role": "Software Engineer Intern",
+          "location": "Toronto, Ontario",
+          "date": "May - Aug 2025",
+          "bullets": [
+            { "id": "b-shop-1", "text": "Deployed a demand-forecasting service to production for 10,000 merchants, improving accuracy by 22%." },
+            { "id": "b-shop-2", "text": "Migrated batch training to Kubernetes, cutting retraining time from 9 hours to 2." }
+          ]
+        },
+        {
+          "id": "exp-epoch",
+          "org": "Epoch Media Group",
+          "role": "Data Engineer Intern",
+          "location": "",
+          "date": "Sep - Dec 2024",
+          "bullets": [
+            { "id": "b-epoch-1", "text": "Built ETL pipelines in Python, SQL and Bash curating marketing data across 12 sources." }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "section-education",
+      "title": "EDUCATION",
+      "type": "education",
+      "school": { "id": "education-school", "text": "University of Toronto Scarborough" },
+      "bullets": [
+        { "id": "edu-degree", "text": "Bachelor of Science in Computer Science, CGPA 3.71/4.0, expected 2027." },
+        { "id": "edu-honors", "text": "Dean's List 2023, 2024, 2025." }
+      ]
+    }
+  ]
+}

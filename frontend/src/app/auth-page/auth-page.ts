@@ -6,6 +6,8 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AuthService } from '../features/auth/auth.service';
 import { PaymentService } from '../features/payments/payment.service';
 
+type Phase = 'email' | 'code';
+
 @Component({
   selector: 'app-auth-page',
   standalone: true,
@@ -20,68 +22,90 @@ export class AuthPage {
   private readonly payment = inject(PaymentService);
 
   readonly auth = inject(AuthService);
-  readonly isSignup = this.route.snapshot.data['mode'] === 'signup';
   readonly returnUrl = this.safeReturnUrl(this.route.snapshot.queryParamMap.get('returnUrl'));
   readonly checkoutAction = this.safeCheckoutAction(this.route.snapshot.queryParamMap.get('checkoutAction'));
   readonly isSubmitting = signal(false);
   readonly statusMessage = signal<string | null>(this.getInitialStatusMessage());
+  // Distinguishes a real error (red) from a neutral/positive notice (e.g. "code sent").
+  readonly statusKind = signal<'info' | 'error'>(this.statusMessage() ? 'error' : 'info');
 
-  readonly form = this.fb.nonNullable.group({
-    name: this.fb.nonNullable.control(
-      this.isSignup ? '' : '',
-      this.isSignup ? [Validators.required, Validators.minLength(2)] : [],
-    ),
+  // Two-step passwordless flow: enter email, then the code we email back.
+  readonly phase = signal<Phase>('email');
+  readonly sentToEmail = signal<string>('');
+
+  readonly emailForm = this.fb.nonNullable.group({
     email: this.fb.nonNullable.control('', [Validators.required, Validators.email]),
-    password: this.fb.nonNullable.control('', [Validators.required, Validators.minLength(8)]),
+  });
+  readonly codeForm = this.fb.nonNullable.group({
+    code: this.fb.nonNullable.control('', [Validators.required, Validators.pattern(/^\d{6}$/)]),
   });
 
-  readonly title = computed(() => (this.isSignup ? 'Create your Tailr account' : 'Welcome back'));
+  readonly title = computed(() => (this.phase() === 'email' ? 'Sign in to Tailr' : 'Enter your code'));
   readonly copy = computed(() =>
-    this.isSignup
-      ? 'Create an email/password account for the regular flow, or use Google when you want a one-click sign in.'
-      : 'Use the regular sign in flow to keep your session separate from Google. You can still use Google if that is faster.',
+    this.phase() === 'email'
+      ? 'Use your email to get a one-time sign-in code, or continue with Google — no password needed.'
+      : `We emailed a 6-digit code to ${this.sentToEmail()}. It expires in 10 minutes.`,
   );
-  readonly submitLabel = computed(() => (this.isSignup ? 'Create account' : 'Sign in'));
-  readonly switchLabel = computed(() =>
-    this.isSignup ? 'Already have an account? Sign in' : 'Need an account? Sign up',
-  );
-  readonly switchRoute = computed(() => (this.isSignup ? '/login' : '/signup'));
+
   readonly switchQueryParams = computed(() => ({
     returnUrl: this.returnUrl,
     ...(this.checkoutAction ? { checkoutAction: this.checkoutAction } : {}),
   }));
 
-  submit(): void {
-    if (this.form.invalid || this.isSubmitting()) {
-      this.form.markAllAsTouched();
+  submitEmail(): void {
+    if (this.emailForm.invalid || this.isSubmitting()) {
+      this.emailForm.markAllAsTouched();
       return;
     }
 
     this.isSubmitting.set(true);
     this.statusMessage.set(null);
+    const email = this.emailForm.getRawValue().email.trim();
 
-    const payload = this.form.getRawValue();
-    const request$ = this.isSignup
-      ? this.auth.signUp({
-          name: payload.name,
-          email: payload.email,
-          password: payload.password,
-        })
-      : this.auth.signIn({
-          email: payload.email,
-          password: payload.password,
-        });
+    this.auth.requestCode(email).subscribe({
+      next: (message) => {
+        this.isSubmitting.set(false);
+        this.sentToEmail.set(email);
+        this.phase.set('code');
+        this.statusKind.set('info');
+        this.statusMessage.set(message ?? 'Check your email for a sign-in code.');
+      },
+      error: (error) => {
+        this.isSubmitting.set(false);
+        this.statusKind.set('error');
+        this.statusMessage.set(error?.error?.error ?? 'Unable to send a code right now.');
+      },
+    });
+  }
 
-    request$.subscribe({
+  submitCode(): void {
+    if (this.codeForm.invalid || this.isSubmitting()) {
+      this.codeForm.markAllAsTouched();
+      return;
+    }
+
+    this.isSubmitting.set(true);
+    this.statusMessage.set(null);
+    const code = this.codeForm.getRawValue().code.trim();
+
+    this.auth.verifyCode(this.sentToEmail(), code).subscribe({
       next: () => {
         this.isSubmitting.set(false);
         this.continueAfterAuth();
       },
       error: (error) => {
         this.isSubmitting.set(false);
-        this.statusMessage.set(error?.error?.error ?? 'Unable to authenticate right now.');
+        this.statusKind.set('error');
+        this.statusMessage.set(error?.error?.error ?? 'That code was not accepted.');
       },
     });
+  }
+
+  useDifferentEmail(): void {
+    this.phase.set('email');
+    this.codeForm.reset();
+    this.statusKind.set('info');
+    this.statusMessage.set(null);
   }
 
   googleLogin(): void {
@@ -105,7 +129,7 @@ export class AuthPage {
     const queryError = this.route.snapshot.queryParamMap.get('error');
 
     if (queryError === 'oauth') {
-      return 'Google sign in failed. Try again or use the regular email/password flow.';
+      return 'Google sign in failed. Try again or use a one-time email code.';
     }
 
     return null;

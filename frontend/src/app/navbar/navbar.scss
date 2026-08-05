@@ -124,6 +124,17 @@
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
 }
 
+/* Quiet, transparent variant so it sits beside the white Google button. */
+.auth-btn.outline {
+  color: #f4f6ff;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
+
+.auth-btn.outline:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .user-chip {
   display: inline-flex;
   align-items: center;

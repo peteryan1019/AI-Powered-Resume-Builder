@@ -1,5 +1,6 @@
 import express from 'express';
 import session from "express-session";
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import dotenv from 'dotenv';
 import { PrismaClient } from '../generated/prisma/client.js';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -10,7 +11,8 @@ import resumeRouter from './routes/resume_routes.ts';
 import resumeAIRouter1 from './routes/resumeAI1.js';
 import authSession from "./auth/session.js";
 import { requireAuth } from "./middleware/requireAuth.js";
-import { LocalAuthError, loginLocalUser, signupLocalUser } from './lib/localAuth.js';
+import { LocalAuthError, requestLoginCode, verifyLoginCode } from './lib/localAuth.js';
+import { sendLoginCodeEmail } from './lib/mailer.js';
 
 import profileRouter from './routes/profile_routes.ts';
 
@@ -64,6 +66,48 @@ app.use(
 app.use(authSession.initialize());
 app.use(authSession.session());
 
+// Brute-force / credential-stuffing protection for local auth (bug #3).
+// Per-IP ceiling across all local-auth routes...
+const authIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many attempts. Please try again later.', code: 'rate_limited' },
+});
+// Key a limiter by the request's email, falling back to the IP. ipKeyGenerator
+// normalizes IPv6 to a /56 subnet so a user's whole block can't rotate
+// addresses to bypass the limit (required by express-rate-limit v8).
+const byEmailOrIp = (req: express.Request) =>
+  typeof req.body?.email === 'string' && req.body.email.trim()
+    ? req.body.email.trim().toLowerCase()
+    : ipKeyGenerator(req.ip ?? 'unknown');
+
+// Caps how often a code can be requested for one email (anti email-bombing).
+const requestCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: byEmailOrIp,
+  message: { error: 'Too many code requests. Please try again later.', code: 'rate_limited' },
+});
+// Caps wrong-code guesses per email (the attempt counter in the DB is the
+// primary defense; this is a coarser second layer). Successful logins don't count.
+const verifyCodeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: byEmailOrIp,
+  message: { error: 'Too many attempts. Please try again later.', code: 'rate_limited' },
+});
+
+// Note: express-rate-limit's default in-memory store is per-process and resets
+// on restart — fine for a single droplet. Back it with a shared store (Redis /
+// connect-pg-simple) if this ever runs on more than one instance.
+
 // Mount the user routes
 app.use('/api/users', requireAuth, userRouter);
 app.use('/api/users', requireAuth, resumeRouter);
@@ -111,22 +155,18 @@ app.get(
   }
 );
 
-app.post('/auth/local/signup', async (req, res, next) => {
+// Passwordless local auth. Step 1: email a one-time code. The response is
+// identical for known and unknown emails and does not wait on SMTP, so it never
+// reveals whether an address is registered.
+app.post('/auth/local/request-code', authIpLimiter, requestCodeLimiter, async (req, res, next) => {
   try {
-    const user = await signupLocalUser({
-      email: req.body?.email,
-      password: req.body?.password,
-      name: req.body?.name,
-    });
+    const { email, code } = await requestLoginCode({ email: req.body?.email });
 
-    req.login(user, (loginError) => {
-      if (loginError) {
-        next(loginError);
-        return;
-      }
+    void sendLoginCodeEmail(email, code).catch((err) =>
+      console.error('[auth] login-code email failed:', err),
+    );
 
-      res.status(201).json({ user });
-    });
+    res.status(202).json({ message: 'If that email is valid, a sign-in code is on its way.' });
   } catch (error) {
     if (error instanceof LocalAuthError) {
       res.status(error.statusCode).json({ error: error.message, code: error.code });
@@ -137,12 +177,10 @@ app.post('/auth/local/signup', async (req, res, next) => {
   }
 });
 
-app.post('/auth/local/login', async (req, res, next) => {
+// Step 2: verify the code, then create-or-resolve the account and start a session.
+app.post('/auth/local/verify-code', authIpLimiter, verifyCodeLimiter, async (req, res, next) => {
   try {
-    const user = await loginLocalUser({
-      email: req.body?.email,
-      password: req.body?.password,
-    });
+    const user = await verifyLoginCode({ email: req.body?.email, code: req.body?.code });
 
     req.login(user, (loginError) => {
       if (loginError) {
