@@ -6,6 +6,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  gap: 0.4rem;
   justify-content: space-between;
   gap: 2rem;
   padding: 1.15rem 1.35rem;
@@ -69,15 +70,39 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  transition: transform 160ms ease, background-color 160ms ease, border-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease;
 }
 
 .nav-links a:hover,
-.nav-links button:hover,
-.nav-links a.active {
+.nav-links button:not(:disabled):hover {
   background: rgba(255, 255, 255, 0.14);
   border-color: rgba(255, 255, 255, 0.18);
   transform: translateY(-1px);
+}
+
+.nav-links a.active,
+.nav-links button.active {
+  color: #ffffff;
+  background: rgba(157, 171, 255, 0.18);
+  border-color: rgba(183, 192, 255, 0.52);
+  box-shadow: inset 0 0 0 1px rgba(157, 171, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.nav-links button:disabled {
+  color: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.025);
+  border-color: rgba(255, 255, 255, 0.06);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.auth-btn.link-button.active {
+  outline: 2px solid rgba(183, 192, 255, 0.7);
+  outline-offset: 2px;
 }
 
 .auth-actions {
@@ -99,7 +124,10 @@
   font-size: 0.92rem;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
   white-space: nowrap;
 }
 
@@ -166,8 +194,13 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background:
-    conic-gradient(from 0deg, #4285f4 0 25%, #34a853 0 50%, #fbbc05 0 75%, #ea4335 0 100%);
+  background: conic-gradient(
+    from 0deg,
+    #4285f4 0 25%,
+    #34a853 0 50%,
+    #fbbc05 0 75%,
+    #ea4335 0 100%
+  );
   box-shadow: inset 0 0 0 4px #fff;
   flex: 0 0 auto;
 }

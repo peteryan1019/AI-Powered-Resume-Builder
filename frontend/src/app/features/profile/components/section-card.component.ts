@@ -39,30 +39,47 @@ import { InstanceFormComponent } from './instance-form.component';
       <div class="section-body" *ngIf="expanded">
 
         <!-- Instance list -->
-        <app-instance-row
-          *ngFor="let instance of section.instances"
-          [instance]="instance"
-          [sectionType]="section.type"
-          (editClicked)="openEditForm(instance.id)"
-          (deleteClicked)="instanceDeleted.emit(instance.id)"
-        />
+        <ng-container *ngFor="let instance of section.instances">
+          <app-instance-row
+            [instance]="instance"
+            [sectionType]="section.type"
+            (editClicked)="openEditForm(instance.id)"
+            (deleteClicked)="instanceDeleted.emit(instance.id)"
+          />
+
+          <!-- Edit form appears directly beneath the selected entry -->
+          <app-instance-form
+            *ngIf="showForm && editingInstanceId === instance.id"
+            [sectionType]="section.type"
+            [existingData]="instance.data"
+            (formSubmitted)="onFormSubmit($event)"
+            (formCancelled)="closeForm()"
+          />
+        </ng-container>
 
         <!-- Empty state -->
-        <div class="empty-instances" *ngIf="section.instances.length === 0 && !showForm">
+        <div
+          class="empty-instances"
+          *ngIf="section.instances.length === 0 && !showForm"
+        >
           <p>No entries yet.</p>
         </div>
 
-        <!-- Add / Edit form -->
+        <!-- New-entry form remains at the bottom -->
         <app-instance-form
-          *ngIf="showForm"
+          *ngIf="showForm && editingInstanceId === null"
           [sectionType]="section.type"
-          [existingData]="editingInstance?.data ?? null"
+          [existingData]="null"
           (formSubmitted)="onFormSubmit($event)"
           (formCancelled)="closeForm()"
         />
 
         <!-- Add button at bottom -->
-        <button class="add-instance-btn" *ngIf="!showForm" (click)="openAddForm()">
+        <button
+          class="add-instance-btn"
+          *ngIf="!showForm"
+          (click)="openAddForm()"
+        >
           <i class="ti ti-plus"></i>
           {{ config.addLabel }}
         </button>
