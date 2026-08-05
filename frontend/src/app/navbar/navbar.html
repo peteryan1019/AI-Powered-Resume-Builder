@@ -4,7 +4,7 @@
     <span class="brand-name">Tailr</span>
   </a>
 
-  <div class="nav-center">
+  <div class="nav-center" *ngIf="auth.isAuthenticated()">
     <ul class="nav-links">
       <li>
         <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
@@ -12,67 +12,42 @@
         </a>
       </li>
 
-      <ng-container *ngIf="auth.isAuthenticated(); else signedOutNavigation">
-        <li>
-          <button
-            type="button"
-            [class.active]="isRouteActive('/profile')"
-            [attr.aria-current]="isRouteActive('/profile') ? 'page' : null"
-            (click)="startCheckout('profile_setup', '/profile')"
-          >
-            Profile
-          </button>
-        </li>
+      <li>
+        <button
+          type="button"
+          [class.active]="isRouteActive('/profile')"
+          [attr.aria-current]="isRouteActive('/profile') ? 'page' : null"
+          (click)="startCheckout('profile_setup', '/profile')"
+        >
+          Profile
+        </button>
+      </li>
 
-        <li>
-          <button
-            type="button"
-            [class.active]="isRouteActive('/tailor', true)"
-            [attr.aria-current]="isRouteActive('/tailor', true) ? 'page' : null"
-            (click)="startCheckout('tailor_resume', '/tailor')"
-          >
-            Tailor
-          </button>
-        </li>
+      <li>
+        <button
+          type="button"
+          [class.active]="isRouteActive('/tailor', true)"
+          [attr.aria-current]="isRouteActive('/tailor', true) ? 'page' : null"
+          (click)="startCheckout('tailor_resume', '/tailor')"
+        >
+          Tailor
+        </button>
+      </li>
 
-        <li>
-          <button
-            type="button"
-            [class.active]="isRouteActive('/resume-templates')"
-            [attr.aria-current]="isRouteActive('/resume-templates') ? 'page' : null"
-            (click)="startCheckout('view_templates', '/resume-templates')"
-          >
-            Resume templates
-          </button>
-        </li>
+      <li>
+        <button
+          type="button"
+          [class.active]="isRouteActive('/resume-templates')"
+          [attr.aria-current]="isRouteActive('/resume-templates') ? 'page' : null"
+          (click)="startCheckout('view_templates', '/resume-templates')"
+        >
+          Resume templates
+        </button>
+      </li>
 
-        <li>
-          <a routerLink="/my-resumes" routerLinkActive="active"> My resumes </a>
-        </li>
-      </ng-container>
-
-      <ng-template #signedOutNavigation>
-        <li>
-          <button type="button" disabled aria-label="Profile — sign in required">
-            <i class="ti ti-lock" aria-hidden="true"></i>
-            Profile
-          </button>
-        </li>
-
-        <li>
-          <button type="button" disabled aria-label="Tailor — sign in required">
-            <i class="ti ti-lock" aria-hidden="true"></i>
-            Tailor
-          </button>
-        </li>
-
-        <li>
-          <button type="button" disabled aria-label="Resume templates — sign in required">
-            <i class="ti ti-lock" aria-hidden="true"></i>
-            Resume templates
-          </button>
-        </li>
-      </ng-template>
+      <li>
+        <a routerLink="/my-resumes" routerLinkActive="active"> My resumes </a>
+      </li>
     </ul>
   </div>
 
