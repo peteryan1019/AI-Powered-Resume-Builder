@@ -96,7 +96,37 @@ export async function verifyLoginCode(input: { email: string; code: string }): P
     throw new LocalAuthError('Email and code are required.', 400, 'missing_fields');
   }
 
+  const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!EMAIL_PATTERN.test(email)) {
+    throw new LocalAuthError("Please enter a valid email address.", 400, "invalid_email");
+  }
+
   const record = await prisma.emailLoginCode.findUnique({ where: { email } });
+
+  const invalid = () => new LocalAuthError('Invalid or expired code.', 400, 'invalid_code');
+
+  if (!record) {
+    throw invalid();
+  }
+
+  // Expired or too many wrong guesses → burn it and reject.
+  if (record.expiresAt.getTime() < Date.now() || record.attempts >= MAX_ATTEMPTS) {
+    await prisma.emailLoginCode.delete({ where: { email } }).catch(() => {});
+    throw invalid();
+  }
+
+  if (!hashesEqual(hashCode(code), record.codeHash)) {
+    await prisma.emailLoginCode.update({
+      where: { email },
+      data: { attempts: { increment: 1 } },
+    });
+    throw invalid();
+  }
+
+  // Correct code — consume it and resolve the account (create on first use).
+  return prisma.$transaction(async (tx) => {
+    const existingUser = await tx.user.findUnique({ where: { email } });
 
   const invalid = () => new LocalAuthError('Invalid or expired code.', 400, 'invalid_code');
 
