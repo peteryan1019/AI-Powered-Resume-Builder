@@ -22,17 +22,28 @@ import { InstanceFormComponent } from './instance-form.component';
             {{ section.instances.length }} {{ section.instances.length === 1 ? 'entry' : 'entries' }}
           </span>
         </div>
-        <div class="section-actions" (click)="$event.stopPropagation()">
-          <button class="btn-ghost" (click)="openAddForm()">
-            <i class="ti ti-plus"></i> Add
-          </button>
-          <button class="btn-ghost danger" (click)="onDeleteSection()">
-            <i class="ti ti-trash"></i>
-          </button>
-          <button class="btn-ghost">
-            <i class="ti" [class.ti-chevron-up]="expanded" [class.ti-chevron-down]="!expanded"></i>
-          </button>
-        </div>
+          <div class="section-actions" (click)="$event.stopPropagation()">
+            <button
+              type="button"
+              class="btn-ghost danger"
+              (click)="onDeleteSection()"
+            >
+              <i class="ti ti-trash"></i>
+            </button>
+
+            <button
+              type="button"
+              class="btn-ghost"
+              (click)="expanded = !expanded"
+              [attr.aria-expanded]="expanded"
+            >
+              <i
+                class="ti"
+                [class.ti-chevron-up]="expanded"
+                [class.ti-chevron-down]="!expanded"
+              ></i>
+            </button>
+          </div>
       </div>
 
       <!-- Body -->
