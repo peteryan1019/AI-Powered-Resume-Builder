@@ -23,15 +23,35 @@ export class ResumeBuildService {
   // sent (the global CORS config allows localhost:4200 with credentials).
   private readonly apiUrl = '/api';
 
-  /** Registers a build job and returns the jobId to stream progress against. */
+  /** Registers a build job from a posting URL and returns its jobId. */
   startBuild(
     userId: string,
     url: string,
     templateId: string,
   ): Observable<{ jobId: string }> {
+    return this.registerBuild(userId, { URL: url, templateId });
+  }
+
+  /**
+   * Registers a build job from a pasted job description. Used after a URL build
+   * stopped with `job_post_unreadable` — the AI could not see the posting, so
+   * the user supplies its text instead.
+   */
+  startBuildFromDescription(
+    userId: string,
+    jobDescription: string,
+    templateId: string,
+  ): Observable<{ jobId: string }> {
+    return this.registerBuild(userId, { jobDescription, templateId });
+  }
+
+  private registerBuild(
+    userId: string,
+    body: { templateId: string; URL?: string; jobDescription?: string },
+  ): Observable<{ jobId: string }> {
     return this.http.post<{ jobId: string }>(
       `${this.apiUrl}/users/${userId}/resumes`,
-      { URL: url, templateId },
+      body,
       { withCredentials: true },
     );
   }

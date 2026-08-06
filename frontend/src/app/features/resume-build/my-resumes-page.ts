@@ -388,6 +388,11 @@ export class MyResumesPage implements OnInit {
   }
 
   private safeHostname(url: string): string {
+    // Builds started from a pasted job description have no posting URL.
+    if (!url.trim()) {
+      return 'Pasted job description';
+    }
+
     try {
       return new URL(url).hostname;
     } catch {

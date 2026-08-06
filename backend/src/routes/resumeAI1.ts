@@ -11,6 +11,12 @@ import { createStepTimer } from "../lib/timing.js";
 import { tailorResume } from "../services/test-gemini.js";
 import { finalResume } from "../services/check-gemini.js";
 import { AiModelUnavailableError } from "../services/geminiRetry.js";
+import {
+  isJobPostUnreadable,
+  JobPostUnreadableError,
+  PASTED_JOB_POST_TITLE,
+  type JobPostSource,
+} from "../services/jobPost.js";
 import type { User } from "../../generated/prisma/client.js";
 
 const router = Router();
@@ -25,21 +31,29 @@ const PYTHON_BIN = process.env.PYTHON_BIN ?? path.resolve(".venv/bin/python3");
 //
 // The resume build streams its progress to the browser over Server-Sent Events
 // (SSE). Because EventSource is GET-only and cannot carry a body, the user's
-// inputs (job-post URL + template) are captured by the POST below and stashed
+// inputs (the job post + template) are captured by the POST below and stashed
 // here, keyed by a jobId. The GET /events stream then runs the pipeline using
 // the stored inputs and emits one `state` event per stage.
+//
+// The job post is either a URL the generating AI fetches itself or the raw
+// description text the user pasted after that fetch came back empty.
 // ---------------------------------------------------------------------------
 
 type BuildState = "generating" | "checking" | "generating_pdf";
 
 interface BuildJob {
   userId: string;
-  url: string;
+  jobPost: JobPostSource;
   templateId: string;
   status: "pending" | "running" | "done" | "error";
   resumeId?: string;
   createdAt: number;
 }
+
+// Guards against a paste that is clearly not a job description, and against one
+// large enough to bloat both AI prompts.
+const MIN_JOB_DESCRIPTION_LENGTH = 40;
+const MAX_JOB_DESCRIPTION_LENGTH = 30_000;
 
 const jobs = new Map<string, BuildJob>();
 
@@ -109,13 +123,17 @@ async function generatePdf(content: unknown, templateId: string,): Promise<Uint8
 /**
  * Runs the full resume pipeline, invoking `emit` before each stage so the
  * caller can stream progress. Returns the id of the persisted resume.
+ *
+ * Throws `JobPostUnreadableError` when the generating AI reports it could not
+ * see any of the posting's content, before the checking AI or the PDF stage
+ * runs — the caller turns that into a prompt to paste the description instead.
  */
 async function runBuildPipeline(
   user: User,
-  input: { url: string; templateId: string; jobId: string },
+  input: { jobPost: JobPostSource; templateId: string; jobId: string },
   emit: (state: BuildState) => void,
 ): Promise<string> {
-  const { url, templateId, jobId } = input;
+  const { jobPost, templateId, jobId } = input;
 
   // Builds run concurrently, so every timing line carries a short job id to
   // keep interleaved console output attributable to one build.
@@ -130,16 +148,31 @@ async function runBuildPipeline(
     const tailoredResume = await timer.step("ai tailor", () =>
       tailorResume({
         userProfile: exportedProfile,
-        URL: url,
+        jobPost,
         templateId,
       }),
     );
+
+    // The generating AI saw nothing to tailor to. Stop here rather than spend
+    // the review + render stages on a resume built from the profile alone.
+    if (isJobPostUnreadable(tailoredResume)) {
+      if (jobPost.kind === "url") {
+        throw new JobPostUnreadableError();
+      }
+
+      // Only the URL path can legitimately raise this. The pasted description is
+      // already in the prompt, so asking for it again would loop — treat it as a
+      // bad generation and let the normal error path offer a regenerate.
+      throw new Error(
+        "The AI reported it could not read the pasted job description.",
+      );
+    }
 
     emit("checking");
     const completeResume = await timer.step("ai review", () =>
       finalResume(tailoredResume, {
         userProfile: exportedProfile,
-        URL: url,
+        jobPost,
         templateId,
       }),
     );
@@ -163,12 +196,15 @@ async function runBuildPipeline(
     });
 
     // Title the resume after the job post. The AI emits `jobPostTitle` per the
-    // schema; fall back to the posting hostname if it's missing/blank.
+    // schema; fall back to the posting hostname (or a generic label when the
+    // description was pasted and there is no URL) if it's missing/blank.
     const rawTitle = (completeResume as Record<string, unknown>).jobPostTitle;
     const title =
       typeof rawTitle === "string" && rawTitle.trim()
         ? rawTitle.trim()
-        : hostnameOf(url);
+        : jobPost.kind === "url"
+          ? hostnameOf(jobPost.url)
+          : PASTED_JOB_POST_TITLE;
 
     const createdResume = await timer.step("save resume", () =>
       prisma.resume.create({
@@ -176,7 +212,8 @@ async function runBuildPipeline(
           userId: user.id,
           title,
           templateId,
-          URL: url,
+          // Pasted-description builds have no posting URL to record.
+          URL: jobPost.kind === "url" ? jobPost.url : "",
           content: completeResume,
           pdfData,
         },
@@ -191,11 +228,12 @@ async function runBuildPipeline(
 }
 
 // Kick off a build: validate inputs, register a pending job, hand back a jobId
-// the client opens an SSE stream against.
+// the client opens an SSE stream against. The posting comes in as either `URL`
+// (the normal path) or `jobDescription` (the paste fallback) — never both.
 router.post("/:userId/resumes", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const { URL, templateId } = req.body;
+    const { URL, templateId, jobDescription } = req.body;
 
     if (!req.user) {
       return res.status(401).json({ error: "Please log in." });
@@ -209,8 +247,44 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
         .json({ error: "You cannot create a resume for this user." });
     }
 
-    if (typeof URL !== "string" || !URL.trim()) {
-      return res.status(400).json({ error: "Please enter a valid URL." });
+    const hasUrl = typeof URL === "string" && URL.trim() !== "";
+    const hasDescription =
+      typeof jobDescription === "string" && jobDescription.trim() !== "";
+
+    if (hasUrl && hasDescription) {
+      return res.status(400).json({
+        error: "Send either a job post URL or a pasted description, not both.",
+      });
+    }
+
+    if (!hasUrl && !hasDescription) {
+      return res
+        .status(400)
+        .json({ error: "Please enter a valid URL." });
+    }
+
+    let jobPost: JobPostSource;
+
+    if (hasDescription) {
+      const text = (jobDescription as string).trim();
+
+      if (text.length < MIN_JOB_DESCRIPTION_LENGTH) {
+        return res.status(400).json({
+          error:
+            "That job description looks too short. Paste the full posting text.",
+        });
+      }
+
+      if (text.length > MAX_JOB_DESCRIPTION_LENGTH) {
+        return res.status(400).json({
+          error:
+            "That job description is too long. Paste just the posting itself.",
+        });
+      }
+
+      jobPost = { kind: "text", text };
+    } else {
+      jobPost = { kind: "url", url: (URL as string).trim() };
     }
 
     if (typeof templateId !== "string" || !templateId.trim()) {
@@ -227,7 +301,7 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
     const jobId = randomUUID();
     jobs.set(jobId, {
       userId: currentUser.id,
-      url: URL.trim(),
+      jobPost,
       templateId: t,
       status: "pending",
       createdAt: Date.now(),
@@ -281,7 +355,7 @@ router.post(
       const newJobId = randomUUID();
       jobs.set(newJobId, {
         userId: currentUser.id,
-        url: previousJob.url,
+        jobPost: previousJob.jobPost,
         templateId: previousJob.templateId,
         status: "pending",
         createdAt: Date.now(),
@@ -350,7 +424,7 @@ router.get(
     try {
       const resumeId = await runBuildPipeline(
         currentUser,
-        { url: job.url, templateId: job.templateId, jobId },
+        { jobPost: job.jobPost, templateId: job.templateId, jobId },
         (state) => {
           if (clientGone) return;
           const meta = STAGE_META[state];
@@ -372,6 +446,26 @@ router.get(
       return res.end();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
+
+      // The AI could not see the posting. Not a failure to retry — the user has
+      // to supply the description, so send the client to the paste screen with
+      // the context it needs to start the second build.
+      if (error instanceof JobPostUnreadableError) {
+        console.warn(
+          `[GET /:userId/resumes/:jobId/events] Job post unreadable (job ${jobId}).`,
+        );
+        job.status = "error";
+        if (!clientGone) {
+          send("job_post_unreadable", {
+            message:
+              "We could not read that job posting. Paste the job description and we will tailor from that instead.",
+            url: job.jobPost.kind === "url" ? job.jobPost.url : "",
+            templateId: job.templateId,
+          });
+        }
+        return res.end();
+      }
+
       console.error(
         `[GET /:userId/resumes/:jobId/events] Build failed (job ${jobId}):`,
         error,
@@ -583,7 +677,12 @@ router.post(
       const content = resume.content as Record<string, unknown>;
       const rawTitle = content.jobPostTitle;
 
-      const title = typeof rawTitle === "string" && rawTitle.trim() ? rawTitle.trim() : hostnameOf(resume.URL);
+      const title =
+        typeof rawTitle === "string" && rawTitle.trim()
+          ? rawTitle.trim()
+          : resume.URL
+            ? hostnameOf(resume.URL)
+            : PASTED_JOB_POST_TITLE;
 
       const updatedResume = await prisma.resume.update({
         where: {

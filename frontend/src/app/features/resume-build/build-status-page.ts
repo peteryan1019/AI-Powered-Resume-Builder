@@ -334,6 +334,10 @@ export class BuildStatusPage implements OnInit, OnDestroy {
   readonly canRegenerate = signal(false);
   readonly retrying = signal(false);
 
+  // Set when the stream ended by sending us elsewhere (the posting could not be
+  // read), so the stream's closing `error` event is not reported as a failure.
+  private readonly leaving = signal(false);
+
   readonly headline = computed(() =>
     this.errorMessage()
       ? 'Resume build stopped'
@@ -415,6 +419,23 @@ export class BuildStatusPage implements OnInit, OnDestroy {
       void this.router.navigate(['/tailor/result', resumeId]);
     });
 
+    // The generating AI saw none of the posting's content. Nothing to retry with
+    // this URL — collect the description from the user and build from that.
+    this.source.addEventListener('job_post_unreadable', (event) => {
+      const data = JSON.parse((event as MessageEvent).data) as {
+        url?: string;
+        templateId?: string;
+      };
+      this.leaving.set(true);
+      this.source?.close();
+      void this.router.navigate(['/tailor/describe'], {
+        queryParams: {
+          ...(data.url ? { url: data.url } : {}),
+          ...(data.templateId ? { template: data.templateId } : {}),
+        },
+      });
+    });
+
     this.source.addEventListener('build_error', (event) => {
       const data = JSON.parse((event as MessageEvent).data) as {
         canRegenerate?: boolean;
@@ -428,8 +449,9 @@ export class BuildStatusPage implements OnInit, OnDestroy {
     });
 
     this.source.addEventListener('error', () => {
-      // A clean server close also surfaces as `error`; only report if we never finished.
-      if (!this.completed() && !this.errorMessage()) {
+      // A clean server close also surfaces as `error`; only report if we never
+      // finished and are not already navigating away.
+      if (!this.completed() && !this.errorMessage() && !this.leaving()) {
         this.errorMessage.set('Lost connection while building your resume. Please try again.');
         this.canRegenerate.set(false);
         this.source?.close();
