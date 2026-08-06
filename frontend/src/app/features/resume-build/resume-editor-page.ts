@@ -5,10 +5,14 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
 import {
   ResumeService,
+  type EducationSection,
   type EntriesSection,
   type OrganizationEntriesSection,
   type ResumeBullet,
+  type ResumeContent,
+  type ResumeSection,
   type EditableResumeResponse,
+  type ContactPart,
 } from '../../services/resume.service';
 import { ResumeLivePreview } from './resume-live-preview';
 import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
@@ -106,8 +110,40 @@ import { finalize, switchMap, tap } from 'rxjs';
               </div>
             </article>
 
-            @for (section of loadedResume.content.sections; track section.id) {
+            @for (
+              section of loadedResume.content.sections;
+              track section.id;
+              let sectionIndex = $index
+            ) {
               <article class="panel section-panel">
+                <div class="section-actions" aria-label="Section actions">
+                  <button
+                    type="button"
+                    class="section-action-button"
+                    [disabled]="sectionIndex === 0"
+                    (click)="moveItem(loadedResume.content.sections, sectionIndex, -1)"
+                  >
+                    ↑ Move section up
+                  </button>
+
+                  <button
+                    type="button"
+                    class="section-action-button"
+                    [disabled]="sectionIndex === loadedResume.content.sections.length - 1"
+                    (click)="moveItem(loadedResume.content.sections, sectionIndex, 1)"
+                  >
+                    ↓ Move section down
+                  </button>
+
+                  <button
+                    type="button"
+                    class="section-action-button danger"
+                    (click)="deleteSection(loadedResume.content.sections, sectionIndex)"
+                  >
+                    Delete section
+                  </button>
+                </div>
+
                 <label>
                   Section title
                   <input
@@ -484,28 +520,17 @@ import { finalize, switchMap, tap } from 'rxjs';
                   }
 
                   @case ('education') {
-                    <label>
-                      School
-                      <input
-                        type="text"
-                        [(ngModel)]="section.school.text"
-                        [attr.data-editor-id]="section.school.id"
-                        (focus)="highlightElement(section.school.id)"
-                        (blur)="clearHighlight()"
-                      />
-                    </label>
-
                     <div
-                      class="item-card"
-                      *ngFor="let bullet of section.bullets; let bulletIndex = index"
+                      class="entry-card"
+                      *ngFor="let entry of section.entries; let entryIndex = index"
                     >
                       <button
                         type="button"
                         class="reorder-button move-up"
-                        [disabled]="bulletIndex === 0"
-                        (click)="moveItem(section.bullets, bulletIndex, -1)"
-                        aria-label="Move bullet up"
-                        title="Move bullet up"
+                        [disabled]="entryIndex === 0"
+                        (click)="moveItem(section.entries, entryIndex, -1)"
+                        aria-label="Move school up"
+                        title="Move school up"
                       >
                         <span aria-hidden="true">↑</span>
                       </button>
@@ -513,10 +538,10 @@ import { finalize, switchMap, tap } from 'rxjs';
                       <button
                         type="button"
                         class="reorder-button move-down"
-                        [disabled]="bulletIndex === section.bullets.length - 1"
-                        (click)="moveItem(section.bullets, bulletIndex, 1)"
-                        aria-label="Move bullet down"
-                        title="Move bullet down"
+                        [disabled]="entryIndex === section.entries.length - 1"
+                        (click)="moveItem(section.entries, entryIndex, 1)"
+                        aria-label="Move school down"
+                        title="Move school down"
                       >
                         <span aria-hidden="true">↓</span>
                       </button>
@@ -524,32 +549,146 @@ import { finalize, switchMap, tap } from 'rxjs';
                       <button
                         type="button"
                         class="delete-button"
-                        (click)="deleteBullet(section.bullets, bulletIndex)"
-                        aria-label="Delete bullet"
-                        title="Delete bullet"
+                        (click)="deleteEntry(section.entries, entryIndex)"
+                        aria-label="Delete school"
+                        title="Delete school"
                       >
                         <span aria-hidden="true">🗑</span>
                       </button>
 
                       <label>
-                        Bullet
-                        <textarea
-                          rows="3"
-                          [(ngModel)]="bullet.text"
-                          [attr.data-editor-id]="bullet.id"
-                          (focus)="highlightElement(bullet.id)"
+                        School
+                        <input
+                          type="text"
+                          [(ngModel)]="entry.school.text"
+                          [attr.data-editor-id]="entry.school.id"
+                          (focus)="highlightElement(entry.school.id)"
                           (blur)="clearHighlight()"
-                        ></textarea>
+                        />
                       </label>
+
+                      <div
+                        class="item-card"
+                        *ngFor="let bullet of entry.bullets; let bulletIndex = index"
+                      >
+                        <button
+                          type="button"
+                          class="reorder-button move-up"
+                          [disabled]="bulletIndex === 0"
+                          (click)="moveItem(entry.bullets, bulletIndex, -1)"
+                          aria-label="Move bullet up"
+                          title="Move bullet up"
+                        >
+                          <span aria-hidden="true">↑</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          class="reorder-button move-down"
+                          [disabled]="bulletIndex === entry.bullets.length - 1"
+                          (click)="moveItem(entry.bullets, bulletIndex, 1)"
+                          aria-label="Move bullet down"
+                          title="Move bullet down"
+                        >
+                          <span aria-hidden="true">↓</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          class="delete-button"
+                          (click)="deleteBullet(entry.bullets, bulletIndex)"
+                          aria-label="Delete bullet"
+                          title="Delete bullet"
+                        >
+                          <span aria-hidden="true">🗑</span>
+                        </button>
+
+                        <label *ngIf="bullet.label !== undefined">
+                          Label
+                          <input
+                            type="text"
+                            [(ngModel)]="bullet.label"
+                            [attr.data-editor-id]="bullet.id"
+                            (focus)="highlightElement(bullet.id)"
+                            (blur)="clearHighlight()"
+                          />
+                        </label>
+
+                        <label>
+                          Bullet
+                          <textarea
+                            rows="3"
+                            [(ngModel)]="bullet.text"
+                            [attr.data-editor-id]="bullet.id"
+                            (focus)="highlightElement(bullet.id)"
+                            (blur)="clearHighlight()"
+                          ></textarea>
+                        </label>
+
+                        <label *ngIf="bullet.url !== undefined">
+                          URL
+                          <input
+                            type="text"
+                            [(ngModel)]="bullet.url"
+                            [attr.data-editor-id]="bullet.id"
+                            (focus)="highlightElement(bullet.id)"
+                            (blur)="clearHighlight()"
+                          />
+                        </label>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="add-button compact"
+                        (click)="addBullet(entry.bullets, true)"
+                      >
+                        + Add education bullet
+                      </button>
                     </div>
 
-                    <button type="button" class="add-button" (click)="addBullet(section.bullets)">
-                      + Add bullet
+                    <button type="button" class="add-button" (click)="addEducationEntry(section)">
+                      + Add school
                     </button>
                   }
                 }
               </article>
             }
+
+            <article class="panel add-section-panel">
+              <h2>Add section</h2>
+              <p>Choose the layout; you can rename the section immediately after adding it.</p>
+
+              <div class="section-type-buttons">
+                <button
+                  type="button"
+                  class="add-button"
+                  (click)="addSection(loadedResume.content.sections, 'bullets')"
+                >
+                  + List / skills
+                </button>
+                <button
+                  type="button"
+                  class="add-button"
+                  (click)="addSection(loadedResume.content.sections, 'entries')"
+                >
+                  + Projects / awards
+                </button>
+                <button
+                  type="button"
+                  class="add-button"
+                  (click)="addSection(loadedResume.content.sections, 'org_entries')"
+                >
+                  + Experience
+                </button>
+                <button
+                  type="button"
+                  class="add-button"
+                  (click)="addSection(loadedResume.content.sections, 'education')"
+                >
+                  + Education
+                </button>
+              </div>
+            </article>
           </div>
         </main>
 
@@ -615,6 +754,22 @@ import { finalize, switchMap, tap } from 'rxjs';
         border-color: rgba(122, 97, 255, 0.3);
       }
 
+      .section-actions,
+      .section-type-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+      }
+
+      .section-actions {
+        justify-content: flex-end;
+      }
+
+      .add-section-panel p {
+        margin: -0.35rem 0 0;
+        color: rgba(244, 246, 255, 0.68);
+      }
+
       .entry-card,
       .item-card {
         position: relative;
@@ -634,6 +789,7 @@ import { finalize, switchMap, tap } from 'rxjs';
       }
 
       .add-button,
+      .section-action-button,
       .reorder-button,
       .delete-button {
         color: #fff;
@@ -661,6 +817,33 @@ import { finalize, switchMap, tap } from 'rxjs';
       .add-button:hover {
         background: rgba(122, 97, 255, 0.3);
         transform: translateY(-1px);
+      }
+
+      .section-action-button {
+        padding: 0.45rem 0.7rem;
+        border: 1px solid rgba(122, 97, 255, 0.42);
+        border-radius: 0.55rem;
+        background: rgba(122, 97, 255, 0.12);
+        font-size: 0.78rem;
+      }
+
+      .section-action-button:hover:not(:disabled) {
+        background: rgba(122, 97, 255, 0.28);
+      }
+
+      .section-action-button.danger {
+        border-color: rgba(255, 124, 124, 0.38);
+        background: rgba(255, 92, 92, 0.12);
+        color: #ffb3b3;
+      }
+
+      .section-action-button.danger:hover {
+        background: rgba(255, 92, 92, 0.28);
+      }
+
+      .section-action-button:disabled {
+        cursor: not-allowed;
+        opacity: 0.35;
       }
 
       .delete-button {
@@ -876,6 +1059,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
           resume.content.jobPostTitle = resume.title ?? '';
         }
 
+        this.ensureEditableContactParts(resume.content);
         this.resume.set(resume);
         this.loading.set(false);
       },
@@ -893,6 +1077,57 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
       ...(includeLabel ? { label: '' } : {}),
       ...(includeUrl ? { url: '' } : {}),
     };
+  }
+
+  private createStandardEntry(): EntriesSection['entries'][number] {
+    return {
+      id: `entry-${crypto.randomUUID()}`,
+      heading: '',
+      meta: '',
+      date: '',
+      bullets: [this.createBullet()],
+    };
+  }
+
+  private createOrganizationEntry(): OrganizationEntriesSection['entries'][number] {
+    return {
+      id: `organization-entry-${crypto.randomUUID()}`,
+      org: '',
+      role: '',
+      location: '',
+      date: '',
+      bullets: [this.createBullet()],
+    };
+  }
+
+  private createEducationEntry(): EducationSection['entries'][number] {
+    return {
+      id: `education-entry-${crypto.randomUUID()}`,
+      school: { id: `education-school-${crypto.randomUUID()}`, text: '' },
+      bullets: [this.createBullet(true)],
+    };
+  }
+
+  private ensureEditableContactParts(content: ResumeContent): void {
+    const parts = content.header.contact.parts;
+
+    const defaults: ContactPart[] = [
+      { id: 'contact-phone', text: '' },
+      { id: 'contact-email', text: '', href: '' },
+      { id: 'contact-linkedin', text: '', href: '' },
+      { id: 'contact-github', text: '', href: '' },
+      { id: 'contact-portfolio', text: '', href: '' },
+    ];
+
+    for (const defaultPart of defaults) {
+      const existingPart = parts.find((part) => part.id === defaultPart.id);
+
+      if (!existingPart) {
+        parts.push(defaultPart);
+      } else if (defaultPart.href !== undefined && existingPart.href === undefined) {
+        existingPart.href = '';
+      }
+    }
   }
 
   addBullet(bullets: ResumeBullet[], includeLabel = false): void {
@@ -914,13 +1149,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   }
 
   addStandardEntry(section: EntriesSection): void {
-    section.entries.push({
-      id: `entry-${crypto.randomUUID()}`,
-      heading: '',
-      meta: '',
-      date: '',
-      bullets: [this.createBullet()],
-    });
+    section.entries.push(this.createStandardEntry());
     this.scheduleAutoSave();
   }
 
@@ -933,14 +1162,69 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   }
 
   addOrganizationEntry(section: OrganizationEntriesSection): void {
-    section.entries.push({
-      id: `organization-entry-${crypto.randomUUID()}`,
-      org: '',
-      role: '',
-      location: '',
-      date: '',
-      bullets: [this.createBullet()],
-    });
+    section.entries.push(this.createOrganizationEntry());
+    this.scheduleAutoSave();
+  }
+
+  addEducationEntry(section: EducationSection): void {
+    section.entries.push(this.createEducationEntry());
+    this.scheduleAutoSave();
+  }
+
+  addSection(sections: ResumeSection[], type: ResumeSection['type']): void {
+    const id = `section-${crypto.randomUUID()}`;
+    let section: ResumeSection;
+
+    switch (type) {
+      case 'bullets':
+        section = {
+          id,
+          title: 'NEW LIST SECTION',
+          type,
+          bullets: [this.createBullet(true)],
+        };
+        break;
+      case 'entries':
+        section = {
+          id,
+          title: 'NEW ENTRY SECTION',
+          type,
+          entries: [this.createStandardEntry()],
+        };
+        break;
+      case 'org_entries':
+        section = {
+          id,
+          title: 'NEW EXPERIENCE SECTION',
+          type,
+          entries: [this.createOrganizationEntry()],
+        };
+        break;
+      case 'education':
+        section = {
+          id,
+          title: 'EDUCATION',
+          type,
+          entries: [this.createEducationEntry()],
+        };
+        break;
+    }
+
+    sections.push(section);
+    this.scheduleAutoSave();
+  }
+
+  deleteSection(sections: ResumeSection[], sectionIndex: number): void {
+    const confirmed = window.confirm(
+      'Delete this entire section? This will also delete all entries and bullets inside it.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    sections.splice(sectionIndex, 1);
+    this.clearHighlight();
     this.scheduleAutoSave();
   }
 

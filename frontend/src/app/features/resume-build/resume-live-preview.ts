@@ -27,13 +27,15 @@ import type { ResumeContent } from '../../services/resume.service';
 
         <div class="contact-line">
           @for (part of content.header.contact.parts; track part.id) {
-            <span [attr.data-resume-id]="part.id" [class.edit-highlight]="isHighlighted(part.id)">
-              @if (part.href) {
-                <a [href]="part.href">{{ part.text }}</a>
-              } @else {
-                {{ part.text }}
-              }
-            </span>
+            @if (part.text) {
+              <span [attr.data-resume-id]="part.id" [class.edit-highlight]="isHighlighted(part.id)">
+                @if (part.href) {
+                  <a [href]="part.href">{{ part.text }}</a>
+                } @else {
+                  {{ part.text }}
+                }
+              </span>
+            }
           }
         </div>
       </header>
@@ -149,28 +151,40 @@ import type { ResumeContent } from '../../services/resume.service';
             }
 
             @case ('education') {
-              <div
-                class="education-school"
-                [attr.data-resume-id]="section.school.id"
-                [class.edit-highlight]="isHighlighted(section.school.id)"
-              >
-                <strong>{{ section.school.text }}</strong>
-              </div>
-
-              <ul>
-                @for (bullet of section.bullets; track bullet.id) {
-                  <li
-                    [attr.data-resume-id]="bullet.id"
-                    [class.edit-highlight]="isHighlighted(bullet.id)"
+              @for (entry of section.entries; track entry.id) {
+                <article
+                  class="resume-entry education-entry"
+                  [attr.data-resume-id]="entry.id"
+                  [class.edit-highlight]="isHighlighted(entry.id)"
+                >
+                  <div
+                    class="education-school"
+                    [attr.data-resume-id]="entry.school.id"
+                    [class.edit-highlight]="isHighlighted(entry.school.id)"
                   >
-                    {{ bullet.text }}
+                    <strong>{{ entry.school.text }}</strong>
+                  </div>
 
-                    @if (bullet.url) {
-                      <a [href]="bullet.url">{{ bullet.url }}</a>
+                  <ul>
+                    @for (bullet of entry.bullets; track bullet.id) {
+                      <li
+                        [attr.data-resume-id]="bullet.id"
+                        [class.edit-highlight]="isHighlighted(bullet.id)"
+                      >
+                        @if (bullet.label) {
+                          <strong>{{ bullet.label }}</strong>
+                        }
+
+                        {{ bullet.text }}
+
+                        @if (bullet.url) {
+                          <a [href]="bullet.url">{{ bullet.url }}</a>
+                        }
+                      </li>
                     }
-                  </li>
-                }
-              </ul>
+                  </ul>
+                </article>
+              }
             }
           }
         </section>
@@ -371,7 +385,7 @@ import type { ResumeContent } from '../../services/resume.service';
       }
 
       .template-signal .resume-entry > ul,
-      .template-signal .section-education > ul {
+      .template-signal .education-entry > ul {
         margin-top: 0.55cqw;
       }
 
@@ -521,7 +535,7 @@ import type { ResumeContent } from '../../services/resume.service';
       }
 
       .template-evergreen .resume-entry > ul,
-      .template-evergreen .section-education > ul {
+      .template-evergreen .education-entry > ul {
         margin-top: 0.6cqw;
       }
 
@@ -678,7 +692,7 @@ import type { ResumeContent } from '../../services/resume.service';
       }
 
       .template-atelier .resume-entry > ul,
-      .template-atelier .section-education > ul {
+      .template-atelier .education-entry > ul {
         margin-top: 0.55cqw;
       }
 

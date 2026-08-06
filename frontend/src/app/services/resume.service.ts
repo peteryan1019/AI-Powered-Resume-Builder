@@ -69,6 +69,12 @@ export interface OrganizationEntry {
   bullets: ResumeBullet[];
 }
 
+export interface EducationEntry {
+  id: string;
+  school: ResumeText;
+  bullets: ResumeBullet[];
+}
+
 export interface BulletsSection {
   id: string;
   title: string;
@@ -94,12 +100,14 @@ export interface EducationSection {
   id: string;
   title: string;
   type: 'education';
-  school: ResumeText;
-  bullets: ResumeBullet[];
+  entries: EducationEntry[];
 }
 
 export type ResumeSection =
-  BulletsSection | EntriesSection | OrganizationEntriesSection | EducationSection;
+  | BulletsSection
+  | EntriesSection
+  | OrganizationEntriesSection
+  | EducationSection;
 
 export interface ResumeContent {
   jobPostTitle: string;
@@ -114,6 +122,7 @@ export interface ResumeContent {
 
   sections: ResumeSection[];
 }
+
 export interface EditableResumeResponse {
   resume: {
     id: string;
@@ -193,6 +202,6 @@ export class ResumeService {
   }
 
   getPdfUrl(userId: string, resumeId: string): string {
-    return `${this.apiURL}/users/${userId}` + `/resumes/${resumeId}/pdf`;
+    return `${this.apiURL}/users/${userId}/resumes/${resumeId}/pdf`;
   }
 }
