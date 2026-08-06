@@ -126,13 +126,55 @@ quantitative, mathematical, or competition-focused roles. They are not
 automatically relevant to a software-development role merely because the
 posting accepts mathematics students.
 
-Prefer recent university-level experience, projects, education, and
-achievements over high-school material.
+RELEVANCE OVERRIDES RECENCY.
 
-Omit high-school awards, contests, clubs, and achievements once the candidate
-has substantial university-level evidence, unless the posting explicitly
-values that exact kind of achievement or it demonstrates a central
-qualification that stronger recent evidence does not demonstrate.
+Never exclude a fact solely because it occurred during high school. Recency is
+a tie-breaker only between facts with similar job relevance.
+
+Distinguish between:
+
+  - EXPERIENCE performed during high school, such as employment, tutoring,
+    teaching, volunteering, leadership, organizing, or completing concrete
+    responsibilities; and
+
+  - HIGH-SCHOOL DISTINCTIONS, such as grades, awards, contests, coursework,
+    simple club membership, or prestige-based achievements.
+
+High-school experience may be DIRECT evidence when its actual responsibilities
+match the posting. Retain it when it demonstrates something that newer
+experience does not demonstrate as specifically.
+
+For example, direct experience tutoring children remains highly relevant to a
+tutoring position even when the candidate later acquired university-level
+technical experience. Teaching through a school club remains experience when
+the candidate actually instructed students, prepared lessons, or led review
+sessions; it is not merely club membership.
+
+High-school distinctions should normally be omitted when stronger and more
+relevant evidence exists. However, do not apply that default exclusion to
+concrete work, teaching, tutoring, volunteer, or leadership responsibilities.
+
+Specificity of match outranks recency. An older experience involving the exact
+audience, subject, responsibility, or environment requested by the posting may
+outrank a newer but less specific experience.
+
+REQUIREMENT-SPECIFIC COVERAGE.
+
+For each core responsibility, identify the profile facts that demonstrate that
+specific responsibility most directly.
+
+When the posting requests experience with a particular audience, environment,
+or activity, prioritize evidence involving that exact audience, environment, or
+activity.
+
+Do not let one broad recent experience suppress older direct experiences that
+cover distinct requirements. For example, university teaching does not make
+earlier tutoring of children redundant when the posting specifically requests
+experience working with children.
+
+When several DIRECT experiences each demonstrate a different important
+dimension of the role, retain those distinct experiences rather than treating
+them as duplicates.
 
 When multiple profile items demonstrate the same qualification, retain the one
 or two most directly relevant sources of evidence. Do not include weaker or

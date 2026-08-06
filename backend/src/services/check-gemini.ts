@@ -142,13 +142,65 @@ A broad eligibility statement does not make every achievement in that field
 relevant. For example, accepting mathematics students does not automatically
 make mathematics contests relevant to software-development responsibilities.
 
-Prefer recent university-level experience, projects, education, and
-achievements over high-school material.
+RELEVANCE OVERRIDES RECENCY.
 
-Omit high-school awards, contests, clubs, and achievements when stronger
-university-level evidence exists, unless the posting explicitly values the
-specific achievement or it demonstrates a central qualification that stronger
-recent evidence does not demonstrate.
+Never delete or deprioritize a fact solely because it occurred during high
+school. Recency is a tie-breaker only between facts with similar job relevance.
+
+Distinguish between:
+
+  - EXPERIENCE performed during high school, including employment, tutoring,
+    teaching, volunteering, leadership, organizing, mentoring, or other concrete
+    responsibilities; and
+
+  - HIGH-SCHOOL DISTINCTIONS, including grades, awards, contests, coursework,
+    simple club membership, or prestige-based achievements.
+
+High-school experience may be DIRECT evidence when its actual responsibilities
+match the posting. Retain it when it demonstrates something that newer
+experience does not demonstrate as specifically.
+
+A school-club role involving actual instruction, lesson preparation,
+mentorship, organization, or leadership is experience—not merely club
+membership.
+
+For example, experience tutoring children remains direct evidence for a
+tutoring position even when the candidate later acquired university-level
+teaching or technical experience.
+
+High-school distinctions should normally be removed when stronger relevant
+evidence exists. Do not apply that default exclusion to concrete work,
+teaching, tutoring, volunteer, or leadership responsibilities.
+
+Specificity of match outranks recency. An older experience involving the exact
+audience, subject, responsibility, or environment requested by the posting may
+outrank a newer but less specific experience.
+
+REQUIREMENT-SPECIFIC COVERAGE.
+
+For each core responsibility, identify the profile facts that demonstrate that
+specific responsibility most directly.
+
+If the profile supplies direct evidence involving the posting's particular
+audience, environment, subject, or activity, do not replace it with newer but
+less specific material.
+
+Do not allow one broad recent experience to suppress older direct experiences
+that cover distinct requirements. For example, university teaching does not
+make earlier tutoring of children redundant when the posting specifically
+requests experience working with children.
+
+Do not treat two experiences as redundant merely because both belong to a
+broad category such as teaching. They remain distinct when they demonstrate
+different requirements, such as:
+  - working with children versus university students;
+  - one-on-one tutoring versus classroom instruction;
+  - test preparation versus assignment grading;
+  - preparing teaching materials versus answering student questions.
+
+When multiple DIRECT experiences each demonstrate a different important
+dimension of the role, retain those experiences before considering less
+relevant projects, skills, awards, or distinctions.
 
 Evaluate EVERY profile category, but do not restore a category merely because
 it exists. A profile fact may be truthful and impressive while still being too
@@ -261,8 +313,10 @@ Examples:
   - spoken languages may appear under Skills when relevant;
   - tutoring and education outreach may justify a dedicated Teaching Experience
     section for a tutoring role;
-  - high-school contests should normally be omitted when stronger and more
-    recent university-level evidence exists;
+  - high-school distinctions should normally be omitted when stronger relevant
+    evidence exists, but directly relevant tutoring, teaching, volunteer, work,
+    and leadership responsibilities remain experience regardless of when they
+    occurred;
   - a project section should receive sufficient detail when projects directly
     demonstrate the posting's requested technical abilities.
 
