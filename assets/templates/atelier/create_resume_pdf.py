@@ -217,15 +217,22 @@ def prune_resume_data(data: dict) -> dict:
                 sections.append({**base, "entries": entries})
 
         elif kind == "education":
-            school = section.get("school") or {}
-            school_text = _s(school.get("text"))
-            bullets = _clean_bullets(section.get("bullets"))
-            if school_text or bullets:
-                sections.append({
-                    **base,
-                    "school": {"id": school.get("id", ""), "text": school_text},
-                    "bullets": bullets,
-                })
+            entries = []
+            for entry in section.get("entries") or []:
+                school = entry.get("school") or {}
+                school_text = _s(school.get("text"))
+                bullets = _clean_bullets(entry.get("bullets"))
+                if school_text or bullets:
+                    entries.append({
+                        "id": entry.get("id", ""),
+                        "school": {
+                            "id": school.get("id", ""),
+                            "text": school_text,
+                        },
+                        "bullets": bullets,
+                    })
+            if entries:
+                sections.append({**base, "entries": entries})
 
         # An unrecognised section type has no renderer, so it is dropped.
 
@@ -558,16 +565,21 @@ class ResumePDF:
                         shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
 
             elif section["type"] == "education":
-                school = section.get("school") or {}
-                school_text = _s(school.get("text"))
-                shown = bool(school_text)
-                if shown:
-                    self._text(COL_X, self.y, school_text, FONT_BOLD, self.body, INK)
-                    self.elements[school.get("id", "")] = (COL_X, self.y, COL_W, self.body)
-                for b in section.get("bullets") or []:
+                for ei, entry in enumerate(section.get("entries") or []):
+                    if ei > 0:
+                        self.y -= self._rigid(LINE) + self._flex(ENTRY_SPACE)
+                    school = entry.get("school") or {}
+                    school_text = _s(school.get("text"))
+                    shown = bool(school_text)
                     if shown:
-                        self.y -= self.line
-                    shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
+                        self._text(COL_X, self.y, school_text, FONT_BOLD, self.body, INK)
+                        self.elements[school.get("id", "")] = (
+                            COL_X, self.y, COL_W, self.body,
+                        )
+                    for b in entry.get("bullets") or []:
+                        if shown:
+                            self.y -= self.line
+                        shown = self._bullet(b.get("id", ""), self._bullet_tokens(b)) or shown
 
         if not self.measure:
             self.c.showPage()

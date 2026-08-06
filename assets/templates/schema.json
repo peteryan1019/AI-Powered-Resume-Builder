@@ -250,20 +250,7 @@
                 "type": "string",
                 "enum": ["education"]
               },
-              "school": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "type": "string"
-                  }
-                },
-                "required": ["id", "text"]
-              },
-              "bullets": {
+              "entries": {
                 "type": "array",
                 "items": {
                   "type": "object",
@@ -272,27 +259,47 @@
                     "id": {
                       "type": "string"
                     },
-                    "label": {
-                      "type": "string"
+                    "school": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": ["id", "text"]
                     },
-                    "text": {
-                      "type": "string"
-                    },
-                    "url": {
-                      "type": "string"
+                    "bullets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": ["id", "text"]
+                      }
                     }
                   },
-                  "required": ["id", "text"]
+                  "required": ["id", "school", "bullets"]
                 }
               }
             },
-            "required": [
-              "id",
-              "title",
-              "type",
-              "school",
-              "bullets"
-            ]
+            "required": ["id", "title", "type", "entries"]
           }
         ]
       }
