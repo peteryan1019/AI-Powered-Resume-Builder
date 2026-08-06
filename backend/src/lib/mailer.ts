@@ -1,84 +1,49 @@
-import nodemailer, { type Transporter } from 'nodemailer';
+import { Resend } from 'resend';
 
 /**
- * Email delivery.
+ * Email delivery via the Resend HTTP API.
  *
- * nodemailer is only an SMTP *client* — it still needs an SMTP endpoint to hand
- * mail to. There is no zero-cost way to deliver mail reliably from scratch
- * (deliverability needs a reputable sending domain with SPF/DKIM), so:
+ * The production droplet blocks outbound SMTP ports (25/465/587), so SMTP-based
+ * sending times out. Resend sends over HTTPS (443), which is open. Config:
  *
- *   - Production / real delivery: set SMTP_HOST / SMTP_PORT / SMTP_USER /
- *     SMTP_PASS (e.g. a free Gmail address with an app password). No code change.
- *   - Local dev with nothing configured: we fall back to nodemailer's Ethereal
- *     test account, which needs no signup and returns a preview URL instead of
- *     actually delivering. The URL is logged so you can open the email.
+ *   - RESEND_API_KEY — the Resend API key.
+ *   - MAIL_FROM      — the From address, which MUST be on a domain verified in
+ *                      Resend (e.g. "Tailr <login@contact.resume-builder.dev>"),
+ *                      or Resend rejects the send.
+ *
+ * Local dev with no API key falls back to logging the code to the console so
+ * sign-in still works without sending a real email.
  */
 
-const FROM = process.env.MAIL_FROM || 'Tailr <no-reply@tailr.local>';
+const FROM = process.env.MAIL_FROM || 'Tailr <login@contact.resume-builder.dev>';
 
-let transporterPromise: Promise<Transporter> | null = null;
-
-function buildTransporter(): Promise<Transporter> {
-  const host = process.env.SMTP_HOST;
-
-  if (host) {
-    const port = Number(process.env.SMTP_PORT) || 587;
-    const transporter = nodemailer.createTransport({
-      host,
-      port,
-      // 465 = implicit TLS; anything else upgrades via STARTTLS.
-      secure: port === 465,
-      auth:
-        process.env.SMTP_USER && process.env.SMTP_PASS
-          ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
-          : undefined,
-    });
-    return Promise.resolve(transporter);
-  }
-
-  // No SMTP configured — dev fallback. Ethereal captures the message and gives
-  // a preview URL; nothing is delivered to the real recipient.
-  return nodemailer.createTestAccount().then((testAccount) =>
-    nodemailer.createTransport({
-      host: 'smtp.ethereal.email',
-      port: 587,
-      secure: false,
-      auth: { user: testAccount.user, pass: testAccount.pass },
-    }),
-  );
-}
-
-function getTransporter(): Promise<Transporter> {
-  if (!transporterPromise) {
-    transporterPromise = buildTransporter();
-  }
-  return transporterPromise;
-}
-
-async function sendMail(message: { to: string; subject: string; text: string; html: string }): Promise<void> {
-  const transporter = await getTransporter();
-  const info = await transporter.sendMail({ from: FROM, ...message });
-
-  const preview = nodemailer.getTestMessageUrl(info);
-  if (preview) {
-    // Dev (Ethereal) — surface the link so the email can be opened.
-    console.log(`[mailer] preview URL for ${message.to}: ${preview}`);
-  }
-}
+const apiKey = process.env.RESEND_API_KEY;
+const resend = apiKey ? new Resend(apiKey) : null;
 
 /** Sends the one-time login code for passwordless sign-in. */
 export async function sendLoginCodeEmail(to: string, code: string): Promise<void> {
-  await sendMail({
-    to,
-    subject: `Your Tailr sign-in code: ${code}`,
-    text:
-      `Your Tailr sign-in code is ${code}\n\n` +
-      `It expires in 10 minutes and can be used once. ` +
-      `If you did not try to sign in, you can ignore this email.`,
-    html:
-      `<p>Your Tailr sign-in code is:</p>` +
-      `<p style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:12px 0">${code}</p>` +
-      `<p>It expires in 10 minutes and can be used once. ` +
-      `If you did not try to sign in, you can ignore this email.</p>`,
-  });
+  const subject = `Your Tailr sign-in code: ${code}`;
+  const text =
+    `Your Tailr sign-in code is ${code}\n\n` +
+    `It expires in 10 minutes and can be used once. ` +
+    `If you did not try to sign in, you can ignore this email.`;
+  const html =
+    `<p>Your Tailr sign-in code is:</p>` +
+    `<p style="font-size:28px;font-weight:bold;letter-spacing:4px;margin:12px 0">${code}</p>` +
+    `<p>It expires in 10 minutes and can be used once. ` +
+    `If you did not try to sign in, you can ignore this email.</p>`;
+
+  // Dev fallback: no API key → print the code so local sign-in still works.
+  if (!resend) {
+    console.log(`[mailer] RESEND_API_KEY not set — login code for ${to}: ${code}`);
+    return;
+  }
+
+  const { error } = await resend.emails.send({ from: FROM, to, subject, text, html });
+
+  // The Resend SDK returns an error object rather than throwing; surface it so
+  // the caller's catch logs it.
+  if (error) {
+    throw new Error(`Resend send failed: ${error.message ?? JSON.stringify(error)}`);
+  }
 }

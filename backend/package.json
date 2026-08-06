@@ -25,10 +25,10 @@
     "express-rate-limit": "^8.6.2",
     "express-session": "^1.19.0",
     "multer": "^2.2.0",
-    "nodemailer": "^9.0.4",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.21.0",
+    "resend": "^6.18.1",
     "stripe": "^22.3.1"
   },
   "devDependencies": {
@@ -37,7 +37,6 @@
     "@types/express-session": "^1.19.0",
     "@types/multer": "^2.2.0",
     "@types/node": "^25.9.3",
-    "@types/nodemailer": "^8.0.1",
     "@types/passport": "^1.0.17",
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/pg": "^8.20.0",
