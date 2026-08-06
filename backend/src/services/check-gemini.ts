@@ -39,8 +39,12 @@ You are a senior hiring manager reviewing a DRAFT resume written for a specific
 job posting. Return a REVISED version that is strictly stronger, fully truthful,
 and better targeted.
 
-Deleting unsupported or weak material, adding supported material the draft
-missed, and reorganizing the section structure are all part of your job.
+In this prompt, "stronger" means more useful and relevant for this specific
+job—not more prestigious, impressive, or extensive in general.
+
+Deleting unsupported, weak, indirectly relevant, or prestige-only material;
+adding relevant supported material the draft missed; and reorganizing the
+section structure are all part of your job.
 
 JOB POSTING URL:
 ${input2.URL}
@@ -61,6 +65,10 @@ a starting point, not a required section list.
 Retrieve the posting at the URL EXACTLY ONCE, and retrieve nothing else. Do not
 follow links found on that page, open other postings, or fetch the page again.
 
+Distinguish core selection criteria from broad eligibility statements. A field
+being listed as an acceptable degree does not automatically make every
+achievement associated with that field relevant.
+
 If the posting cannot be retrieved, proceed using the draft and verified
 profile alone.
 
@@ -68,11 +76,13 @@ Run all five passes below as internal reasoning. Do not output the critique.
 Output only the revised resume JSON.
 
 PASS 1 — TRUTH.
+
 Check every claim in the draft against the verified profile.
 
 Delete anything not directly supported. Repair overstated wording so it matches
 the profile exactly. Never invent or infer a skill, technology, project,
-employer, role, credential, date, metric, achievement, or responsibility.
+employer, role, credential, date, metric, achievement, responsibility, or
+outcome.
 
 Correct invented numbers to the profile's exact figures or remove them.
 
@@ -81,24 +91,131 @@ category, but the presentation must remain truthful. For example, volunteer
 work may appear under an accurately titled Experience section, but it must not
 be represented as paid or professional employment.
 
-PASS 2 — COVERAGE.
-Enumerate the posting's requirements. For every requirement, check whether the
-verified profile contains supporting evidence.
+Verify every URL against the matching profile item. Preserve only exact verified
+URLs. Delete invented, altered, shortened, or incorrectly assigned URLs.
 
-Where the profile supports a requirement but the draft fails to show it, add
-the strongest supporting fact. Restore any relevant experience, volunteer
-work, project, education, skill, certification, award, language, or custom
-detail that the draft wrongly omitted.
+PASS 2 — RELEVANCE AND COVERAGE.
 
-Evaluate EVERY profile category. Do not focus only on paid work, projects, and
-technical skills.
+Enumerate the posting's actual responsibilities and required and preferred
+qualifications.
+
+For every requirement, check whether the verified profile contains direct or
+meaningful supporting evidence. Coverage is satisfied when the requirement is
+represented by the strongest job-relevant evidence. Coverage does not require
+including every profile fact connected to that requirement.
+
+Classify every profile fact as:
+
+  1. DIRECT EVIDENCE:
+     Specifically demonstrates a core responsibility, technology, skill,
+     qualification, or expected outcome from the posting.
+
+  2. SUPPORTING EVIDENCE:
+     Demonstrates a useful transferable capability not already shown more
+     directly.
+
+  3. PRESTIGE-ONLY EVIDENCE:
+     Impressive, selective, unusual, or highly ranked, but does not materially
+     demonstrate the work requested by the posting.
+
+  4. IRRELEVANT EVIDENCE:
+     Does not meaningfully strengthen the application for this role.
+
+Restore missing DIRECT evidence first. Restore SUPPORTING evidence only when it
+adds a meaningful qualification or dimension not already demonstrated more
+directly.
+
+Delete PRESTIGE-ONLY and IRRELEVANT material. Do this even when the material is
+objectively impressive, highly selective, unusual, or quantified.
+
+Relevance is a gate. Impressiveness, selectivity, metrics, and prestige are
+tie-breakers only between facts with similar job relevance.
+
+A fact is not strong merely because:
+  - it has a national or international ranking;
+  - it is highly selective or competitive;
+  - it demonstrates general intelligence;
+  - it is associated with an accepted academic field;
+  - it appeared in the draft or a previous resume.
+
+A broad eligibility statement does not make every achievement in that field
+relevant. For example, accepting mathematics students does not automatically
+make mathematics contests relevant to software-development responsibilities.
+
+Prefer recent university-level experience, projects, education, and
+achievements over high-school material.
+
+Omit high-school awards, contests, clubs, and achievements when stronger
+university-level evidence exists, unless the posting explicitly values the
+specific achievement or it demonstrates a central qualification that stronger
+recent evidence does not demonstrate.
+
+Evaluate EVERY profile category, but do not restore a category merely because
+it exists. A profile fact may be truthful and impressive while still being too
+weakly related to deserve resume space.
+
+When applicable, prefer evidence in this order:
+
+  1. directly relevant employment, teaching, volunteer, or practical experience;
+  2. directly relevant demonstrated projects;
+  3. relevant education, credentials, awards, or verified achievements;
+  4. standalone skill claims.
+
+This ordering is subordinate to actual job relevance. A directly relevant
+project is more valuable than unrelated employment, and a directly relevant
+credential is more valuable than an unrelated project.
+
+Do not restore a project, skill list, award, or other weaker item when stronger
+evidence already demonstrates the same qualification.
 
 Split any bullet that incorrectly compresses multiple distinct accomplishments.
 Do not duplicate the same fact in multiple locations.
 
+ENTRY-DEPTH CHECK.
+
+For every directly relevant selected project or experience, identify all
+distinct verified accomplishments supplied by the profile.
+
+Normally retain 2-4 substantive bullets for a major relevant project when the
+profile supports them.
+
+Restore important implementation, testing, design, security, collaboration,
+technology, and outcome details that the draft over-compressed or omitted.
+
+Use one substantive bullet only when:
+  - the project or entry is secondary;
+  - the profile contains only one relevant verified accomplishment; or
+  - additional bullets would genuinely repeat the same fact.
+
+Do not treat several distinct accomplishments inside one selected project as
+redundant merely because they support the same overall qualification.
+
+Rules about retaining only the strongest one or two sources of evidence apply
+between competing profile items, not to distinct accomplishments within a
+selected high-value entry.
+
+VERIFIED-LINK CHECK.
+
+For every retained project and certification, check whether the verified
+profile supplies a URL.
+
+If it does, the corresponding entry must contain exactly one link bullet with:
+  - a unique descriptive "id";
+  - "label": "Project Link:" for a project or "Credential:" for a certification;
+  - "text": "";
+  - "url": the exact verified URL.
+
+Restore a missing verified link, preserve a correct link, and delete any URL not
+supported by the matching profile item. Link bullets do not count as
+substantive accomplishment bullets.
+
 PASS 3 — SECTION DESIGN.
-Reconsider the resume structure after selecting the strongest facts. You may
-create, remove, rename, and reorder sections.
+
+Reconsider the resume structure after selecting the most job-relevant facts.
+You may create, remove, rename, and reorder sections.
+
+Use as few non-empty sections as necessary, commonly 2-5. There is no minimum
+section count.
 
 Every section must use one of these schema-supported types:
 
@@ -112,49 +229,116 @@ For an "education" section, use an "entries" array. Create one entry for each
 school or distinct education record. Every education entry contains its own
 "id", "school", and "bullets".
 
-Create a standalone section when its content is central to the posting or
+Create a standalone section only when its content is central to the posting or
 substantial enough to justify its own heading. Otherwise, integrate it into the
-most natural existing section.
+most natural relevant section or omit it.
+
+Every section must earn its place:
+
+  - Projects and Technical Skills are optional section choices, not default
+    resume sections.
+  - Retain Projects when they provide direct evidence of core responsibilities
+    or qualifications.
+  - Retain Technical Skills when specific technologies materially help evaluate
+    the candidate.
+  - Remove Awards or Distinctions when they are impressive but not sufficiently
+    relevant to this posting.
+  - Avoid weak one-item sections unless the item represents a central
+    qualification.
+  - Return only non-empty sections.
+
+Prefer depth in strong sections over breadth across weak sections. Delete a
+weak or indirectly relevant section when doing so provides space to explain a
+directly relevant project or experience properly.
+
+Do not preserve an entire section merely because it already exists in the
+draft.
 
 Examples:
-  - academic distinctions may remain under Education instead of becoming a
-    separate Awards section;
+  - relevant academic distinctions may remain under Education instead of
+    becoming a separate Awards section;
   - certifications may appear under Skills or Education;
   - spoken languages may appear under Skills when relevant;
-  - tutoring and education outreach may justify a dedicated Teaching
-    Experience section for a tutoring role.
+  - tutoring and education outreach may justify a dedicated Teaching Experience
+    section for a tutoring role;
+  - high-school contests should normally be omitted when stronger and more
+    recent university-level evidence exists;
+  - a project section should receive sufficient detail when projects directly
+    demonstrate the posting's requested technical abilities.
 
-Avoid weak one-item sections unless the item represents a central qualification
-for the job. Use accurate section titles and return only non-empty sections.
+Use accurate section titles. Never describe volunteer experience as paid
+employment.
 
 PASS 4 — LANGUAGE AND STRENGTH.
+
 Align wording with the posting's vocabulary wherever the underlying fact is
 genuinely supported. Rephrasing a verified fact is required when it improves
 the match; claiming an unsupported match is forbidden.
 
 Rewrite vague or passive bullets using concrete action verbs. State what was
-done, the relevant technology or method, and a verified outcome, scale, or
-impact where available.
+done, the relevant approach, method, or technology when useful, and a verified
+outcome, scale, or impact when available.
 
-Remove filler and redundancy. Reorder sections, entries, and bullets so the
-most job-relevant evidence appears first.
+Do not force technical details into nontechnical applications. Do not force
+metrics, tools, methods, or outcomes that the profile does not supply.
+
+Use one distinct accomplishment per bullet. Split compressed bullets when the
+profile supports multiple meaningful accomplishments.
+
+Remove filler and genuine redundancy. Reorder sections, entries, and bullets so
+the most job-relevant evidence appears first.
 
 Use "Spoken Languages:" for human languages so they are not confused with
 programming languages.
 
 PASS 5 — ONE-PAGE CONTENT SELECTION.
-Target approximately 18-24 bullets or equivalent content items across
-approximately 3-6 sections. Most accomplishment bullets should be around 15-25
-words.
 
-These are relevance targets, not mandatory quotas. Do not pad the resume or
-retain weaker material merely to keep the revision as long as the draft.
+There is no minimum section, bullet, or content-item count. Use only the amount
+of material needed to present the candidate's strongest job-relevant match.
 
-The revision may be shorter when removing unsupported, redundant, or
-lower-relevance material. When the profile contains stronger omitted material,
-replace weaker content with it.
+Most resumes will contain approximately 8-18 substantive bullets or equivalent
+content items across approximately 2-5 sections. These are broad ranges, not
+targets or quotas.
+
+Relevance is a gate; impressiveness is only a tie-breaker.
+
+Do not remove detailed, directly relevant project or experience evidence to
+make room for a more prestigious but less relevant award, contest, credential,
+or achievement.
+
+Do not achieve concision by reducing every entry to one bullet. First remove
+the least relevant sections and entries. Then preserve enough distinct bullets
+to make the strongest projects and experiences convincing.
+
+A major project with several relevant verified accomplishments should normally
+receive 2-4 substantive bullets.
+
+The revision should be shorter whenever removing indirect, repetitive,
+prestige-only, or lower-value evidence makes the strongest qualifications
+easier to identify.
+
+Delete supported material when:
+  - stronger and more direct evidence already demonstrates the same requirement;
+  - it is only loosely connected to the posting;
+  - it is impressive but not materially relevant;
+  - it creates an unnecessary section;
+  - it distracts from directly relevant experience or projects;
+  - it exists primarily to fill page space.
+
+Before finalizing, check:
+  - Does every section materially strengthen this application?
+  - Does every major relevant project contain sufficient verified detail?
+  - Did the revision keep prestige-only evidence at the expense of direct
+    evidence?
+  - Did it retain a weak section while reducing a strong project to one vague
+    bullet?
+  - Is any qualification repeated through weaker evidence?
+
+Whitespace is preferable to weak, repetitive, indirectly related, or
+prestige-only content.
 
 STRUCTURAL RULES.
+
   - Preserve the required root and header property names.
   - Preserve "jobPostTitle" as the exact job title from the posting and correct
     it if the draft is wrong.
@@ -173,27 +357,39 @@ STRUCTURAL RULES.
   - Set both "text" and "href" for linked contact parts.
   - Use a "mailto:" href for email.
   - Return JSON only: no markdown, commentary, critique, or code fences.
-  - The exact section shapes are:
-    - "bullets":
-      { "id", "title", "type": "bullets", "bullets": [...] }
 
-    - "entries":
-      { "id", "title", "type": "entries", "entries": [...] }
-      Each entry contains:
-      { "id", "heading", "meta", "date", "bullets" }
+The exact section shapes are:
 
-    - "org_entries":
-      { "id", "title", "type": "org_entries", "entries": [...] }
-      Each entry contains:
-      { "id", "org", "role", "location", "date", "bullets" }
+  - "bullets":
+    { "id", "title", "type": "bullets", "bullets": [...] }
 
-    - "education":
-      { "id", "title", "type": "education", "entries": [...] }
-      Each education entry contains:
-      { "id", "school": { "id", "text" }, "bullets" }
+  - "entries":
+    { "id", "title", "type": "entries", "entries": [...] }
 
-    Every bullet contains "id" and "text", and may also contain "label" and "url".
-    The JSON response schema is authoritative if any structural ambiguity remains.
+    Each entry contains:
+    { "id", "heading", "meta", "date", "bullets" }
+
+  - "org_entries":
+    { "id", "title", "type": "org_entries", "entries": [...] }
+
+    Each entry contains:
+    { "id", "org", "role", "location", "date", "bullets" }
+
+  - "education":
+    { "id", "title", "type": "education", "entries": [...] }
+
+    Each education entry contains:
+    { "id", "school": { "id", "text" }, "bullets" }
+
+Every ordinary bullet contains "id" and "text", and may also contain "label"
+and "url".
+
+A project or certification link uses:
+{ "id", "label": "Project Link:" or "Credential:", "text": "", "url" }
+
+The URL must be copied exactly from the matching verified profile item.
+
+The JSON response schema is authoritative if any structural ambiguity remains.
 `,
 
       tools: [{ type: "url_context" }],
