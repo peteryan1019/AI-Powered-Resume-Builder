@@ -96,16 +96,87 @@ ${unretrievableNote}
 Run all five passes below as internal reasoning. Do not output the critique.
 Output only the revised resume JSON.
 
-PASS 1 — TRUTH.
+PASS 1 — TRUTH AND FIELD-BY-FIELD PROVENANCE.
 
-Check every claim in the draft against the verified profile.
+Treat the draft as completely untrusted. The presence of a claim in the draft
+is not evidence that the claim is true, even when it is realistic,
+conventional, or professionally worded.
 
-Delete anything not directly supported. Repair overstated wording so it matches
-the profile exactly. Never invent or infer a skill, technology, project,
-employer, role, credential, date, metric, achievement, responsibility, or
-outcome.
+Check every candidate claim in the draft independently against the verified
+profile.
 
-Correct invented numbers to the profile's exact figures or remove them.
+The verified profile is the only source of facts about the candidate. The job
+posting is only a source of the target title, requirements, responsibilities,
+and vocabulary. The root skeleton is only a structural template. Neither the
+draft, posting, nor skeleton may supply missing candidate facts.
+
+A claim is supported only when it appears in the specific matching profile
+entry to which the draft assigns it. A fact appearing elsewhere in the profile
+does not support transferring it to another entry.
+
+For every retained resume entry:
+
+  1. Match it to one specific source entry in the verified profile.
+  2. Verify each field and bullet against that same source entry.
+  3. Preserve supported facts, allowing truthful rephrasing.
+  4. Delete or empty every field that cannot be traced to that source entry.
+
+If the source entry is ambiguous or cannot be identified, fail closed: remove
+the unsupported claim instead of assuming that it is correct.
+
+A missing, omitted, null, undefined, or empty profile value means "not
+provided." Never complete it with a plausible value.
+
+Never invent, infer, transfer, or complete a skill, technology, project,
+employer, role, location, work arrangement, credential, date, GPA, grade,
+metric, achievement, responsibility, or outcome.
+
+Correct invented numbers to the matching profile entry's exact figures or
+remove them.
+
+MANDATORY LOCATION AUDIT.
+
+For every "org_entries" entry:
+
+  - Locate its matching work, volunteer, teaching, or leadership entry in the
+    verified profile.
+  - Retain a location only when that exact matching profile entry explicitly
+    supplies it.
+  - Copy that location exactly.
+  - If the matching profile entry supplies no location, set "location" to "".
+
+The following do not support an experience location:
+
+  - the candidate's profile/header location;
+  - the target job posting's location;
+  - another work or volunteer entry's location;
+  - the employer's commonly known location;
+  - a location invented or preserved by the draft.
+
+Never infer "Remote", "Hybrid", or "On-site." Retain one of these terms only
+when the matching profile entry explicitly contains it.
+
+Delete an unsupported location even if it appears plausible or already exists
+in the draft.
+
+MANDATORY GPA AUDIT.
+
+For every education entry:
+
+  - Locate its one matching education record in the verified profile.
+  - Retain GPA only if that same education record explicitly supplies it.
+  - Preserve only the exact supplied value.
+  - If that education record does not provide GPA, delete every GPA reference
+    from its school text and bullets.
+
+Never calculate, estimate, normalize, convert, round, or infer GPA.
+
+Awards, honours, scholarships, contest results, grades, academic standing,
+degree programs, institutions, and another education record do not support a
+GPA unless the matching record explicitly states the GPA.
+
+Delete unsupported values such as "4.0" or "4.0/4.0" even when they appear in
+the draft. Do not replace them with another guessed value.
 
 The displayed resume section does not need to match the fact's original profile
 category, but the presentation must remain truthful. For example, volunteer
@@ -423,6 +494,12 @@ STRUCTURAL RULES.
   - Each section must contain exactly the properties required by its type.
   - For Education, use "entries"; never place "school" or "bullets" directly
     on the Education section.
+  - For each "org_entries" entry, use the exact location from its matching
+    profile entry or set "location" to "" when none is provided.
+  - Remove every GPA reference unless the matching education record explicitly
+    supplies that exact GPA.
+  - Empty required string fields must remain empty; never fill them to make the
+    resume appear more complete.
   - Preserve valid existing IDs for unchanged sections, entries, and bullets
     when practical.
   - Give every newly created section, entry, and bullet a unique descriptive

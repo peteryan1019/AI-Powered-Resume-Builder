@@ -101,6 +101,95 @@ The root skeleton defines the required header and root properties. Its
 "sections" array is intentionally empty. You must select, create, and order the
 appropriate resume sections for this posting.
 
+SOURCE AUTHORITY AND FACT OWNERSHIP — NON-NEGOTIABLE.
+
+The verified user profile is the only source of facts about the candidate.
+
+The job posting may be used only to determine:
+  - the target job title;
+  - selection criteria;
+  - relevant vocabulary;
+  - content relevance and ordering.
+
+The job posting is never a source of facts about the candidate. Do not assign
+the posting's employer, location, work arrangement, responsibilities,
+technologies, qualifications, or other details to any candidate experience.
+
+The root skeleton is a structural template only. Empty skeleton fields are not
+facts and are not invitations to generate realistic values.
+
+A candidate fact is supported only when it appears in the matching profile
+entry from which the resume entry is derived. The fact merely appearing
+somewhere else in the profile is not sufficient support.
+
+Preserve fact ownership:
+
+  - A profile/header location describes the candidate generally. It is not the
+    location of any work, volunteer, project, or education entry.
+  - A location belonging to one profile entry may not be copied to another
+    profile entry.
+  - The target job's location may not be used as the location of any candidate
+    experience.
+  - A GPA belonging to one education record may not be applied to another
+    education record.
+  - A job title, date, technology, metric, or achievement belonging to one
+    entry may not be reassigned to another entry.
+
+A missing, omitted, null, undefined, or empty source value means "not
+provided." It does not mean "infer a likely value."
+
+Never complete missing fields with plausible defaults, common assumptions,
+industry conventions, or information from surrounding entries.
+
+MANDATORY LOCATION RULES.
+
+Before creating each "org_entries" entry, match it to one specific work,
+volunteer, teaching, or leadership entry in the verified profile.
+
+Set the resume entry's "location" to the location explicitly supplied by that
+same matched profile entry and no other source.
+
+If that matched profile entry does not explicitly provide a location, set:
+
+  "location": ""
+
+In particular:
+
+  - Never substitute the candidate's profile/header location.
+  - Never substitute the target job posting's location.
+  - Never copy a location from another work or volunteer entry.
+  - Never infer "Remote", "Hybrid", or "On-site".
+  - Never infer a location from the employer's known offices, name, website, or
+    surrounding context.
+  - Never place an unsupported location in a bullet or another field to avoid
+    leaving "location" empty.
+
+The word "Remote" may appear only when the matching profile entry explicitly
+states that the experience was remote.
+
+MANDATORY GPA RULES.
+
+A GPA may appear only when the matching education record in the verified
+profile explicitly supplies that GPA.
+
+Copy the GPA exactly as supplied. Do not calculate, estimate, normalize,
+convert, round, improve, or infer it.
+
+Never infer a GPA from:
+  - grades or academic standing;
+  - awards, scholarships, honours, or distinctions;
+  - admission to a selective program;
+  - contest results;
+  - the institution or degree;
+  - expected or typical student performance;
+  - another education record.
+
+If the matching education record does not explicitly provide a GPA, omit GPA
+entirely. Do not create a GPA bullet, GPA label, grade-equivalent statement, or
+GPA text anywhere in that education entry.
+
+An absent GPA must never become "4.0", "4.0/4.0", or any other value.
+
 STEP 1 — READ THE POSTING.
 
 ${readPostingInstructions}
@@ -225,8 +314,9 @@ This comparison applies between competing profile items. It does not mean
 discarding distinct accomplishments within a selected high-value project or
 experience.
 
-Use only verified facts from the profile. Never invent or infer a skill,
-technology, project, employer, role, credential, date, metric, achievement,
+Use only verified facts from the matching profile entry. Never invent, infer,
+transfer, or complete a skill, technology, project, employer, role, location,
+work arrangement, credential, date, GPA, grade, metric, achievement,
 responsibility, or outcome.
 
 STEP 3 — CREATE THE SECTION STRUCTURE.
@@ -398,6 +488,10 @@ STRUCTURAL RULES.
   - No ID may repeat anywhere in the document.
   - For Education, use "entries"; do not place "school" or "bullets" directly
     on the Education section.
+  - For every "org_entries" entry, use only the location from the matching
+    profile entry; otherwise set "location" to "".
+  - Include GPA only when the matching education record explicitly supplies
+    it; otherwise omit every GPA reference.
   - Fill the header name, phone, and email only from the verified profile.
   - Include LinkedIn, GitHub, and portfolio contact parts only when the profile
     supplies their URLs.
