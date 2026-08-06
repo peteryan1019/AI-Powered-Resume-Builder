@@ -17,6 +17,9 @@ import type { Profile, ProfileInstance, SectionType, User } from '../../generate
 export interface ExportedProfile {
   headers: {
     username: string | null;
+    headline: string | null;
+    location: string | null;
+    summary: string | null;
     contact: { phone: string | null; email: string };
     links: { linkedin: string | null; github: string | null; portfolio: string | null };
   };
@@ -31,6 +34,9 @@ export interface ExportedProfile {
 export function buildHeaders(user: User, profile: Profile | null): ExportedProfile['headers'] {
   return {
     username: user.name,
+    headline: profile?.headline ?? null,
+    location: profile?.location ?? null,
+    summary: profile?.summary ?? null,
     contact: { phone: profile?.phone ?? null, email: user.email },
     links: {
       linkedin: profile?.linkedin ?? null,
@@ -49,10 +55,43 @@ function joinBullets(bullets: unknown): string {
   return Array.isArray(bullets) ? bullets.filter((b) => typeof b === 'string').join(' ') : '';
 }
 
+function joinTechnologies(technologies: unknown): string {
+  if (!Array.isArray(technologies)){
+    return '';
+  }
+
+  const values = technologies.filter(
+    (technology): technology is string =>
+      typeof technology === 'string' && technology.trim() !== '',
+  );
+
+  return values.length > 0 ? `Technologies: ${values.join(', ')}` : '';
+}
+
+function joinCustomDetails(details: unknown): string {
+  if (!Array.isArray(details)){
+    return '';
+  }
+
+  return details
+    .filter(
+      (detail): detail is Record<string, unknown> =>
+        typeof detail === 'object' && detail !== null,
+    )
+    .map((detail) => {
+
+      const label = typeof detail['label'] === 'string' ? detail['label'].trim() : '';
+
+      const value = typeof detail['value'] === 'string' ? detail['value'].trim() : '';
+
+      return label && value ? `${label}: ${value}` : '';
+    }).filter(Boolean).join('. ');
+}
+
 function formatWorkExperience(d: Record<string, any>): { title: string; date: string; description: string } {
   const title = [d.title, d.company].filter(Boolean).join(' — ');
   const date = dateRange(d.startDate, d.endDate, d.current);
-  const description = [d.location, joinBullets(d.bullets)].filter(Boolean).join('. ');
+  const description = [d.location, d.summary, joinTechnologies(d.technologies), joinBullets(d.bullets)].filter(Boolean).join('. ');
   return { title, date, description };
 }
 
@@ -73,7 +112,7 @@ function formatSkills(d: Record<string, any>): { title: string; date: string; de
 function formatProjects(d: Record<string, any>): { title: string; date: string; description: string } {
   const title = d.name ?? '';
   const date = dateRange(d.startDate, d.endDate, d.current);
-  const description = [d.url, joinBullets(d.bullets)].filter(Boolean).join('. ');
+  const description = [d.url, d.summary, joinTechnologies(d.technologies), joinCustomDetails(d.customDetails), joinBullets(d.bullets)].filter(Boolean).join('. ');
   return { title, date, description };
 }
 

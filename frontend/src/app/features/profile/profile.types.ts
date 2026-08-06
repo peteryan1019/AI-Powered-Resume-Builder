@@ -70,6 +70,8 @@ export interface WorkExperienceData {
   endDate?: string;
   current: boolean;
   bullets: string[];
+  summary?: string;
+  technologies?: string[];
 }
 
 export interface EducationData {
@@ -89,11 +91,14 @@ export interface SkillsData {
 
 export interface ProjectData {
   name: string;
+  summary?: string;
+  technologies?: string;
   url?: string;
   startDate?: string;
   endDate?: string;
   current: boolean;
   bullets: string[];
+  customDetails?: Array<{label: string, value: string}>;
 }
 
 export interface CertificationData {
