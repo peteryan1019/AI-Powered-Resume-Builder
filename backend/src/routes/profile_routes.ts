@@ -148,7 +148,7 @@ router.post('/sections', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 // DELETE /api/profile/sections/:sectionId
 // ─────────────────────────────────────────
-router.delete('/sections/:sectionId', async (req: Request, res: Response) => {
+router.delete('/sections/:sectionId', async (req: Request<{ sectionId: string }>, res: Response) => {
   try {
     const userId = req.user!.id;
     const { sectionId } = req.params;
@@ -196,7 +196,7 @@ router.put('/sections/reorder', async (req: Request, res: Response) => {
 // ─────────────────────────────────────────
 // POST /api/profile/sections/:sectionId/instances
 // ─────────────────────────────────────────
-router.post('/sections/:sectionId/instances', async (req: Request, res: Response) => {
+router.post('/sections/:sectionId/instances', async (req: Request<{ sectionId: string }>, res: Response) => {
   try {
     const userId = req.user!.id;
     const { sectionId } = req.params;
@@ -228,7 +228,7 @@ router.post('/sections/:sectionId/instances', async (req: Request, res: Response
 // ─────────────────────────────────────────
 // PUT /api/profile/sections/:sectionId/instances/:instanceId
 // ─────────────────────────────────────────
-router.put('/sections/:sectionId/instances/:instanceId', async (req: Request, res: Response) => {
+router.put('/sections/:sectionId/instances/:instanceId', async (req: Request<{ sectionId: string; instanceId: string }>, res: Response) => {
   try {
     const userId = req.user!.id;
     const { sectionId, instanceId } = req.params;
@@ -256,7 +256,7 @@ router.put('/sections/:sectionId/instances/:instanceId', async (req: Request, re
 // ─────────────────────────────────────────
 // DELETE /api/profile/sections/:sectionId/instances/:instanceId
 // ─────────────────────────────────────────
-router.delete('/sections/:sectionId/instances/:instanceId', async (req: Request, res: Response) => {
+router.delete('/sections/:sectionId/instances/:instanceId', async (req: Request<{ sectionId: string; instanceId: string }>, res: Response) => {
   try {
     const userId = req.user!.id;
     const { sectionId, instanceId } = req.params;
