@@ -82,10 +82,15 @@
       "id": "section-education",
       "title": "EDUCATION",
       "type": "education",
-      "school": { "id": "education-school", "text": "University of Toronto Scarborough" },
-      "bullets": [
-        { "id": "edu-degree", "text": "Bachelor of Science in Computer Science, CGPA 3.71/4.0, expected 2027." },
-        { "id": "edu-honors", "text": "Dean's List 2023, 2024, 2025." }
+      "entries": [
+        {
+          "id": "education-uoft",
+          "school": { "id": "education-school", "text": "University of Toronto Scarborough" },
+          "bullets": [
+            { "id": "edu-degree", "text": "Bachelor of Science in Computer Science, CGPA 3.71/4.0, expected 2027." },
+            { "id": "edu-honors", "text": "Dean's List 2023, 2024, 2025." }
+          ]
+        }
       ]
     }
   ]
