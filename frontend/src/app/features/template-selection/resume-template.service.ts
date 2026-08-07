@@ -53,12 +53,30 @@ export class ResumeTemplateService {
     this.persistTemplateId(validTemplate.id);
   }
 
+  // localStorage is missing under server-side rendering, and reading it throws
+  // outright in privacy-restricted browsers (Safari private mode), so template
+  // selection must never depend on it being there.
+  private storage(): Storage | null {
+    try {
+      return typeof window === 'undefined' ? null : window.localStorage ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   private resolveInitialTemplateId(): string {
-    if (typeof window === 'undefined') {
+    const storage = this.storage();
+    if (!storage) {
       return this.templates[0].id;
     }
 
-    const storedId = window.localStorage.getItem(STORAGE_KEY);
+    let storedId: string | null = null;
+    try {
+      storedId = storage.getItem(STORAGE_KEY);
+    } catch {
+      return this.templates[0].id;
+    }
+
     const validTemplate = this.templates.find((template) => template.id === storedId);
 
     if (validTemplate) {
@@ -70,10 +88,15 @@ export class ResumeTemplateService {
   }
 
   private persistTemplateId(templateId: string): void {
-    if (typeof window === 'undefined') {
+    const storage = this.storage();
+    if (!storage) {
       return;
     }
 
-    window.localStorage.setItem(STORAGE_KEY, templateId);
+    try {
+      storage.setItem(STORAGE_KEY, templateId);
+    } catch {
+      // A full or locked-down store must not break template selection.
+    }
   }
 }
