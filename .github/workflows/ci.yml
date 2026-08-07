@@ -56,6 +56,12 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
+      # The image runs the backend through tsx, which strips types without
+      # checking them — so nothing else in the pipeline would catch a type
+      # error before it became a runtime failure in production.
+      - name: Typecheck
+        run: npx tsc --noEmit
+
       - name: Run tests
         run: npm test
 
