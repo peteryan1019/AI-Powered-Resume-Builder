@@ -1,16 +1,12 @@
 import { Router, type Request, type Response } from "express";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
-import { readFile, unlink } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import os from "node:os";
-import path from "node:path";
 import prisma from "../lib/prisma.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
 import { createStepTimer } from "../lib/timing.js";
 import { tailorResume } from "../services/test-gemini.js";
 import { finalResume } from "../services/check-gemini.js";
 import { AiModelUnavailableError } from "../services/geminiRetry.js";
+import { measureResumeFill, renderResume } from "../services/resumeRender.js";
 import {
   isJobPostUnreadable,
   JobPostUnreadableError,
@@ -20,11 +16,6 @@ import {
 import type { User } from "../../generated/prisma/client.js";
 
 const router = Router();
-
-// Python interpreter used for PDF generation. Defaults to the project venv
-// (backend/.venv), which is where reportlab is installed. Override with the
-// PYTHON_BIN env var in other environments.
-const PYTHON_BIN = process.env.PYTHON_BIN ?? path.resolve(".venv/bin/python3");
 
 // ---------------------------------------------------------------------------
 // Build jobs
@@ -85,41 +76,6 @@ function hostnameOf(url: string): string {
   }
 }
 
-function resolveGeneratorPath(templateId: string): string {
-  switch (templateId) {
-    case "signal":
-      return path.resolve("../assets/templates/signal/create_resume_pdf.py");
-    case "evergreen":
-      return path.resolve("../assets/templates/evergreen/create_resume_pdf.py");
-    case "atelier":
-      return path.resolve("../assets/templates/atelier/create_resume_pdf.py");
-    default:
-      throw new Error(`Unsupported template: ${templateId}`);
-  }
-}
-
-async function generatePdf(content: unknown, templateId: string,): Promise<Uint8Array<ArrayBuffer>> {
-  const generatorPath = resolveGeneratorPath(templateId);
-  const outputPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`);
-
-  try {
-    const pythonProcess = spawn(PYTHON_BIN, [generatorPath, outputPath]);
-
-    pythonProcess.stdin.end(JSON.stringify(content));
-
-    const [exitCode] = (await once(pythonProcess, "close")) as [number];
-
-    if (exitCode !== 0) {
-      throw new Error("PDF generation failed.");
-    }
-
-    const fileBuffer = await readFile(outputPath);
-    return Uint8Array.from(fileBuffer);
-  } finally {
-    await unlink(outputPath).catch(() => undefined);
-  }
-}
-
 /**
  * Runs the full resume pipeline, invoking `emit` before each stage so the
  * caller can stream progress. Returns the id of the persisted resume.
@@ -168,32 +124,49 @@ async function runBuildPipeline(
       );
     }
 
+    // Render the draft purely to find out how much of the page it covers. The
+    // reviewing AI is told to fill the page, which it cannot act on without
+    // knowing how much room the draft actually left unused. The throwaway PDF
+    // costs one local subprocess and no AI spend; a failed measurement returns
+    // null and the review simply runs without a length budget.
+    const draftFill = await timer.step("measure draft fill", () =>
+      measureResumeFill(tailoredResume, templateId),
+    );
+
+    if (draftFill) {
+      console.log(
+        `[resume-build ${jobId.slice(0, 8)}] draft fills ${draftFill.fillPercent}% ` +
+          `of the page (${draftFill.sectionsRendered} sections, ` +
+          `${draftFill.topMarginPt}pt top / ${draftFill.bottomMarginPt}pt bottom blank)`,
+      );
+    }
+
     emit("checking");
     const completeResume = await timer.step("ai review", () =>
-      finalResume(tailoredResume, {
-        userProfile: exportedProfile,
-        jobPost,
-        templateId,
-      }),
+      finalResume(
+        tailoredResume,
+        {
+          userProfile: exportedProfile,
+          jobPost,
+          templateId,
+        },
+        draftFill,
+        `[resume-build ${jobId.slice(0, 8)}]`,
+      ),
     );
 
     emit("generating_pdf");
-    const gPath = resolveGeneratorPath(templateId);
-    const oPath = path.join(os.tmpdir(), `${randomUUID()}.pdf`);
+    const { pdf: pdfData, fill: finalFill } = await timer.step(
+      "render pdf",
+      () => renderResume(completeResume, templateId),
+    );
 
-    const pdfData = await timer.step("render pdf", async () => {
-      const pythonProcess = spawn(PYTHON_BIN, [gPath, oPath]);
-      pythonProcess.stdin.end(JSON.stringify(completeResume));
-
-      const [exitCode] = (await once(pythonProcess, "close")) as [number];
-      if (exitCode !== 0) {
-        throw new Error("PDF generation failed.");
-      }
-
-      const bytes = await readFile(oPath);
-      await unlink(oPath);
-      return bytes;
-    });
+    if (finalFill) {
+      console.log(
+        `[resume-build ${jobId.slice(0, 8)}] final resume fills ` +
+          `${finalFill.fillPercent}% of the page`,
+      );
+    }
 
     // Title the resume after the job post. The AI emits `jobPostTitle` per the
     // schema; fall back to the posting hostname (or a generic label when the
@@ -673,7 +646,10 @@ router.post(
         return res.status(404).json({error: "Resume not found."});
       }
 
-      const pdfData = await generatePdf(resume.content, resume.templateId);
+      const { pdf: pdfData } = await renderResume(
+        resume.content,
+        resume.templateId,
+      );
       const content = resume.content as Record<string, unknown>;
       const rawTitle = content.jobPostTitle;
 

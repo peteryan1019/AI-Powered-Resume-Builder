@@ -60,44 +60,17 @@
   }
 }
 
-.bullets-field,
-.custom-details-field {
+.description-field {
   min-width: 100%;
-}
 
-.bullet-row,
-.detail-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.45rem;
-
-  input {
-    flex: 1;
+  textarea {
+    // A description is now the only detail field, and users are asked to write
+    // at length. Resizing vertically keeps a long one readable without the box
+    // growing wider than the form's grid column.
+    min-height: 11rem;
+    resize: vertical;
+    line-height: 1.5;
   }
-}
-
-.btn-icon-remove {
-  border: none;
-  background: none;
-  color: rgba(244, 246, 255, 0.58);
-  cursor: pointer;
-
-  &:hover {
-    color: #ffb4b4;
-  }
-}
-
-.add-bullet {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  border: none;
-  background: none;
-  color: #cfd8ff;
-  cursor: pointer;
-  font-size: 0.85rem;
-  padding: 0.25rem 0;
 }
 
 .form-actions {

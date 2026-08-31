@@ -85,17 +85,6 @@
         "location": {
           "type": "string"
         },
-        "summary": {
-          "type": "string",
-          "description": "Full role summary, responsibilities, and outcomes."
-        },
-        "technologies": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Tools, technologies, and methods used."
-        },
         "startDate": {
           "type": "string",
           "description": "Start date, preferably formatted as YYYY-MM."
@@ -108,28 +97,9 @@
           "type": "boolean",
           "description": "True only when the person currently works here."
         },
-        "bullets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Every distinct responsibility, achievement, and result."
-        },
-        "customDetails": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "label": {
-                "type": "string"
-              },
-              "value": {
-                "type": "string"
-              }
-            },
-            "required": ["label", "value"]
-          }
+        "description": {
+          "type": "string",
+          "description": "Everything the resume says about this role, as continuous prose: responsibilities, what was built, tools and technologies used, and outcomes. Keep every bullet point word-for-word, joined with blank lines."
         }
       },
       "required": [
@@ -137,7 +107,7 @@
         "title",
         "startDate",
         "current",
-        "bullets"
+        "description"
       ]
     },
     {
@@ -166,15 +136,12 @@
         "endDate": {
           "type": "string"
         },
-        "bullets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Academic distinctions, coursework, and relevant details."
+        "description": {
+          "type": "string",
+          "description": "Everything the resume says about this education record, as continuous prose: named coursework, scholarships, awards, honours, thesis or capstone work, and activities. Name specific courses and awards rather than summarizing them. The GPA belongs in \"gpa\", never here."
         }
       },
-      "required": ["school", "degree", "bullets"]
+      "required": ["school", "degree", "description"]
     },
     {
       "title": "SKILLS data",
@@ -207,17 +174,6 @@
         "url": {
           "type": "string"
         },
-        "summary": {
-          "type": "string",
-          "description": "Complete explanation of what the project does and why it matters."
-        },
-        "technologies": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Tools, languages, frameworks, and platforms used."
-        },
         "startDate": {
           "type": "string"
         },
@@ -228,31 +184,12 @@
           "type": "boolean",
           "description": "True only when the project is ongoing."
         },
-        "bullets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Every project contribution, feature, and measured result."
-        },
-        "customDetails": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "label": {
-                "type": "string"
-              },
-              "value": {
-                "type": "string"
-              }
-            },
-            "required": ["label", "value"]
-          }
+        "description": {
+          "type": "string",
+          "description": "Everything the resume says about this project, as continuous prose: what it does, tools and technologies used, the contributions made, and any measured result. Keep every bullet point word-for-word, joined with blank lines."
         }
       },
-      "required": ["name", "current", "bullets"]
+      "required": ["name", "current", "description"]
     },
     {
       "title": "CERTIFICATIONS data",
@@ -338,15 +275,12 @@
           "type": "boolean",
           "description": "True only when the volunteer activity is ongoing."
         },
-        "bullets": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "description": "Every volunteer duty, contribution, and impact statement. Descriptive text belongs here, not in a description property."
+        "description": {
+          "type": "string",
+          "description": "Everything the resume says about this volunteer activity, as continuous prose: every duty, contribution, and impact statement, word-for-word, joined with blank lines."
         }
       },
-      "required": ["organization", "current", "bullets"]
+      "required": ["organization", "current", "description"]
     }
   ]
 }

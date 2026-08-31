@@ -45,11 +45,13 @@ WORK EXPERIENCE:
 - Never copy the person's profile location into a job that does not explicitly
   provide a location.
 - If a particular job has no stated location, use an empty string.
-- Preserve prose descriptions in data.summary.
-- Preserve every separate bullet point as a separate item in data.bullets.
-- Do not merge bullets into the summary.
-- Populate data.technologies only with technologies explicitly connected to
-  that role.
+- Put everything the resume says about this role into data.description as
+  continuous prose: the role summary, every bullet point, and every technology
+  explicitly connected to that role.
+- Preserve every bullet point word-for-word inside data.description. Joining
+  them into one field is required; dropping, shortening, or summarizing any of
+  them is not.
+- Separate the joined pieces with a blank line so each stays readable.
 - Preserve all stated employment dates and whether the role is current.
 - If one employer contains multiple separately named roles, create a separate
   instance for each role unless the schema explicitly supports nested roles.
@@ -71,7 +73,8 @@ VOLUNTEER:
 - Do not classify volunteer activities as PROJECTS.
 - data.organization must contain the organization when one is provided.
 - data.role must contain the role or activity.
-- Preserve every related bullet point separately in data.bullets.
+- Put every related bullet point word-for-word into data.description as
+  continuous prose, separated by blank lines.
 - Preserve all stated dates and whether the role is current.
 
 PROJECTS:
@@ -81,10 +84,21 @@ PROJECTS:
 - Do not use PROJECTS merely because an activity involved organizing or
   participating in an event.
 - Preserve the exact project name in data.name.
-- Preserve prose descriptions in data.summary.
-- Preserve every separate bullet point as a separate item in data.bullets.
-- Populate technologies only when they are explicitly associated with the
-  project.
+- Put everything the resume says about this project into data.description as
+  continuous prose: the summary, every bullet point word-for-word, and every
+  technology explicitly associated with the project.
+- Separate the joined pieces with a blank line so each stays readable.
+
+EDUCATION:
+
+- Put everything the resume says about this education record into
+  data.description as continuous prose: relevant coursework, scholarships,
+  awards, honours, distinctions, thesis or capstone work, teaching or lab
+  roles, and activities.
+- Name specific courses, scholarships, and awards exactly as the resume names
+  them. Never replace a list of named courses with a phrase such as "relevant
+  coursework".
+- Keep the GPA in data.gpa, never inside data.description.
 
 FIELD OWNERSHIP:
 
@@ -113,15 +127,14 @@ For every section:
 
 The data shape must match the parent section type exactly:
 
-WORK_EXPERIENCE → company, title, location, summary, technologies,
-startDate, endDate, current, bullets, customDetails.
+WORK_EXPERIENCE → company, title, location, startDate, endDate, current,
+description.
 
-EDUCATION → school, degree, field, gpa, startDate, endDate, bullets.
+EDUCATION → school, degree, field, gpa, startDate, endDate, description.
 
 SKILLS → category, skills.
 
-PROJECTS → name, url, summary, technologies, startDate, endDate,
-current, bullets, customDetails.
+PROJECTS → name, url, startDate, endDate, current, description.
 
 CERTIFICATIONS → name, issuer, date, url.
 
@@ -129,7 +142,11 @@ AWARDS → title, issuer, date, description.
 
 LANGUAGES → language, proficiency.
 
-VOLUNTEER → organization, role, startDate, endDate, current, bullets.
+VOLUNTEER → organization, role, startDate, endDate, current, description.
+
+There is no "summary", "technologies", "bullets", or "customDetails" field on
+any section type. Everything they used to hold now belongs inside
+data.description, joined as prose with nothing dropped.
 
 Never use fields belonging to a different section type.
 Create a separate instance for every separately named entry.

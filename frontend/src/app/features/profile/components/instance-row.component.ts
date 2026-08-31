@@ -58,6 +58,20 @@ export class InstanceRowComponent {
     }
   }
 
+  /**
+   * First line of the entry's detail, for the collapsed summary row.
+   *
+   * Reads the simplified forms' `description`, falling back to the legacy
+   * `summary` for rows saved before the forms were simplified. Trimmed to one
+   * line because a description is now free-form prose that can run long.
+   */
+  private detailSnippet(d: Record<string, string>): string {
+    const text = (d['description'] ?? d['summary'] ?? '').trim();
+    if (!text) return '';
+    const firstLine = text.split('\n')[0]!.trim();
+    return firstLine.length > 90 ? `${firstLine.slice(0, 90)}…` : firstLine;
+  }
+
   get secondaryText(): string {
     const d = this.instance.data as Record<string, string>;
     const dateRange = (start?: string, end?: string, current?: boolean) =>
@@ -65,7 +79,7 @@ export class InstanceRowComponent {
 
     switch (this.sectionType) {
       case 'WORK_EXPERIENCE':
-        return [d['company'], d['location'], d['summary'], dateRange(d['startDate'], d['endDate'], !!d['current'])]
+        return [d['company'], d['location'], this.detailSnippet(d), dateRange(d['startDate'], d['endDate'], !!d['current'])]
           .filter(Boolean).join(' · ');
       case 'EDUCATION':
         return [d['school'], dateRange(d['startDate'], d['endDate'])].filter(Boolean).join(' · ');
@@ -74,7 +88,7 @@ export class InstanceRowComponent {
           ? (this.instance.data['skills'] as string[]).join(', ')
           : '';
       case 'PROJECTS':
-        return [d['summary'], dateRange(d['startDate'], d['endDate'], !!d['current'])].filter(Boolean).join(' · ');
+        return [this.detailSnippet(d), dateRange(d['startDate'], d['endDate'], !!d['current'])].filter(Boolean).join(' · ');
       case 'CERTIFICATIONS':
         return [d['issuer'], d['date']].filter(Boolean).join(' · ');
       case 'AWARDS':

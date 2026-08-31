@@ -798,6 +798,9 @@ def create_resume_pdf(output_path: str, RESUME_DATA: Optional[dict] = None, upda
         "gap_scale": round(gap_scale, 3),
         "top_margin": round(top_blank, 1),
         "bottom_margin": round(bottom_blank, 1),
+        # Lets a caller convert the two blank bands into a fill ratio
+        # without assuming a paper size.
+        "page_height": round(PAGE_H, 1),
     })
     if not result["fits_one_page"]:
         result["warning"] = "Content still overflows one page. Shorten or remove optional bullets."
@@ -829,4 +832,4 @@ if __name__ == "__main__":
             output_path
         )
 
-    print(create_resume_pdf(output_path,RESUME_DATA=RESUME_DATA))
+    print(json.dumps(create_resume_pdf(output_path, RESUME_DATA=RESUME_DATA)))

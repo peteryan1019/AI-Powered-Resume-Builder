@@ -5,7 +5,7 @@
 
 import { Component, Input, Output, EventEmitter, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, FormGroup, FormArray, Validators } from '@angular/forms';
+import { ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { SectionType } from '../profile.types';
 
 @Component({
@@ -34,15 +34,6 @@ import { SectionType } from '../profile.types';
               <input formControlName="location" placeholder="Toronto, ON" />
             </div>
           </div>
-          <div class="field-group full-width">
-            <label>Role summary</label>
-            <textarea formControlName="summary" rows="3" placeholder="Describe the scope, responsibilities, and outcomes."></textarea>
-          </div>
-          <div class="field-group full-width">
-            <label>Tools / stack</label>
-            <input formControlName="technologiesRaw" placeholder="React, Node.js, PostgreSQL" />
-            <p class="field-hint">Use commas to separate tools, technologies, or methods.</p>
-          </div>
           <div class="form-row">
             <div class="field-group">
               <label>Start date (month and year) *</label>
@@ -59,7 +50,7 @@ import { SectionType } from '../profile.types';
               </label>
             </div>
           </div>
-          <ng-container *ngTemplateOutlet="bulletsField"></ng-container>
+          <ng-container *ngTemplateOutlet="descriptionField"></ng-container>
         </ng-container>
 
         <!-- ── EDUCATION ───────────────────────── -->
@@ -94,7 +85,7 @@ import { SectionType } from '../profile.types';
               <input formControlName="endDate" type="month" />
             </div>
           </div>
-          <ng-container *ngTemplateOutlet="bulletsField"></ng-container>
+          <ng-container *ngTemplateOutlet="descriptionField"></ng-container>
         </ng-container>
 
         <!-- ── SKILLS ──────────────────────────── -->
@@ -124,15 +115,6 @@ import { SectionType } from '../profile.types';
               <input formControlName="url" placeholder="https://github.com/..." />
             </div>
           </div>
-          <div class="field-group full-width">
-            <label>Project summary</label>
-            <textarea formControlName="summary" rows="3" placeholder="Explain what the project does and why it matters."></textarea>
-          </div>
-          <div class="field-group full-width">
-            <label>Technologies</label>
-            <input formControlName="technologiesRaw" placeholder="Angular, TypeScript, Prisma" />
-            <p class="field-hint">Add one or more tools, libraries, or platforms separated by commas.</p>
-          </div>
           <div class="form-row">
             <div class="field-group">
               <label>Start date (month and year)</label>
@@ -149,8 +131,7 @@ import { SectionType } from '../profile.types';
               </label>
             </div>
           </div>
-          <ng-container *ngTemplateOutlet="bulletsField"></ng-container>
-          <ng-container *ngTemplateOutlet="customDetailsField"></ng-container>
+          <ng-container *ngTemplateOutlet="descriptionField"></ng-container>
         </ng-container>
 
         <!-- ── CERTIFICATIONS ─────────────────── -->
@@ -250,47 +231,25 @@ import { SectionType } from '../profile.types';
               </label>
             </div>
           </div>
-          <ng-container *ngTemplateOutlet="bulletsField"></ng-container>
-          <ng-container *ngTemplateOutlet="customDetailsField"></ng-container>
+          <ng-container *ngTemplateOutlet="descriptionField"></ng-container>
         </ng-container>
 
-        <!-- ── Bullets (shared template) ─────── -->
-        <ng-template #bulletsField>
-          <div class="field-group bullets-field" formArrayName="bullets">
-            <label>Bullet points</label>
-            <div
-              *ngFor="let bullet of bulletsArray.controls; let i = index"
-              class="bullet-row"
-            >
-              <input [formControlName]="i" placeholder="Describe what you did and the impact..." />
-              <button type="button" class="btn-icon-remove" (click)="removeBullet(i)">
-                <i class="ti ti-x"></i>
-              </button>
-            </div>
-            <button type="button" class="btn-ghost add-bullet" (click)="addBullet()">
-              <i class="ti ti-plus"></i> Add bullet
-            </button>
-          </div>
-        </ng-template>
-
-        <!-- ── Custom details (shared template) ─────── -->
-        <ng-template #customDetailsField>
-          <div class="field-group full-width custom-details-field" *ngIf="supportsCustomDetails" formArrayName="customDetails">
-            <label>Additional details</label>
-            <div
-              *ngFor="let detail of customDetailsArray.controls; let i = index"
-              class="detail-row"
-              [formGroupName]="i"
-            >
-              <input formControlName="label" placeholder="Detail label" />
-              <input formControlName="value" placeholder="Add a metric, skill, outcome, or note..." />
-              <button type="button" class="btn-icon-remove" (click)="removeDetail(i)">
-                <i class="ti ti-x"></i>
-              </button>
-            </div>
-            <button type="button" class="btn-ghost add-bullet" (click)="addDetail()">
-              <i class="ti ti-plus"></i> Add detail
-            </button>
+        <!-- ── Description (shared template) ─────── -->
+        <ng-template #descriptionField>
+          <div class="field-group full-width description-field">
+            <label>{{ descriptionLabel }}</label>
+            <textarea
+              formControlName="description"
+              rows="8"
+              [placeholder]="descriptionPlaceholder"
+            ></textarea>
+            <p class="field-hint">
+              Write as much as you can, in plain sentences — there is no need to
+              format this. {{ descriptionHint }} When you generate a resume, the
+              AI rewrites this into bullet points chosen and worded for that
+              specific job posting, so detail you leave out here can never
+              appear on a resume.
+            </p>
           </div>
         </ng-template>
 
@@ -323,59 +282,63 @@ export class InstanceFormComponent implements OnInit {
     }
   }
 
-  get bulletsArray(): FormArray {
-    return this.form.get('bullets') as FormArray;
+  /** Section types whose detail now lives in one free-text description box. */
+  private static readonly DESCRIBED_TYPES: SectionType[] = [
+    'WORK_EXPERIENCE', 'EDUCATION', 'PROJECTS', 'VOLUNTEER',
+  ];
+
+  get usesDescription(): boolean {
+    return InstanceFormComponent.DESCRIBED_TYPES.includes(this.sectionType);
   }
 
-  get customDetailsArray(): FormArray {
-    return this.form.get('customDetails') as FormArray;
+  get descriptionLabel(): string {
+    return this.sectionType === 'EDUCATION' ? 'Coursework, awards, and details' : 'Description';
   }
 
-  get supportsCustomDetails(): boolean {
-    return ['WORK_EXPERIENCE', 'PROJECTS'].includes(this.sectionType);
+  get descriptionPlaceholder(): string {
+    switch (this.sectionType) {
+      case 'WORK_EXPERIENCE':
+        return 'What the team did, what you owned, what you built and with which tools, and how it turned out — numbers included where you have them.';
+      case 'EDUCATION':
+        return 'Relevant coursework, scholarships, awards, thesis or capstone work, teaching or lab roles, and anything else that might matter to an employer.';
+      case 'PROJECTS':
+        return 'What the project does, why you built it, the stack you used, the parts you personally implemented, and any results or usage numbers.';
+      case 'VOLUNTEER':
+        return 'The organisation, what you actually did week to week, who you worked with, and any outcome you can point to.';
+      default:
+        return '';
+    }
   }
 
-  addBullet(): void {
-    this.bulletsArray.push(this.fb.control(''));
-  }
-
-  removeBullet(index: number): void {
-    this.bulletsArray.removeAt(index);
-  }
-
-  addDetail(): void {
-    this.customDetailsArray.push(this.createDetailGroup());
-  }
-
-  removeDetail(index: number): void {
-    this.customDetailsArray.removeAt(index);
+  get descriptionHint(): string {
+    switch (this.sectionType) {
+      case 'EDUCATION':
+        return 'Name specific courses and awards rather than summarising them.';
+      case 'WORK_EXPERIENCE':
+      case 'PROJECTS':
+        return 'Name every tool and technology you actually used.';
+      default:
+        return '';
+    }
   }
 
   onSubmit(): void {
     if (this.form.invalid) return;
-    const raw = this.form.value;
+    const raw = { ...this.form.value } as Record<string, unknown>;
 
     // Normalize skills from comma string to array
-    if (this.sectionType === 'SKILLS' && raw.skillsRaw) {
-      raw.skills = (raw.skillsRaw as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-      delete raw.skillsRaw;
+    if (this.sectionType === 'SKILLS' && raw['skillsRaw']) {
+      raw['skills'] = (raw['skillsRaw'] as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+      delete raw['skillsRaw'];
     }
 
-    // Remove empty bullets
-    if (raw.bullets) {
-      raw.bullets = (raw.bullets as string[]).filter(b => b.trim() !== '');
-    }
-
-    if (raw.customDetails) {
-      raw.customDetails = (raw.customDetails as Array<{ label?: string; value?: string }>).filter(detail => {
-        return Boolean(detail.label?.trim() && detail.value?.trim());
-      });
-    }
-
-    if (this.sectionType === 'WORK_EXPERIENCE' || this.sectionType === 'PROJECTS') {
-      if (raw.technologiesRaw) {
-        raw.technologies = (raw.technologiesRaw as string).split(',').map((item: string) => item.trim()).filter(Boolean);
-        delete raw.technologiesRaw;
+    // Saving converts a legacy row to the new shape. The legacy values were
+    // folded into the description box when the form loaded, so dropping the
+    // keys here removes duplicates rather than data — without this the export
+    // in backend/src/lib/profileExport.ts would emit both copies.
+    if (this.usesDescription) {
+      for (const legacyKey of ['summary', 'technologies', 'bullets', 'customDetails']) {
+        delete raw[legacyKey];
       }
     }
 
@@ -384,68 +347,70 @@ export class InstanceFormComponent implements OnInit {
 
   // ── Form builders ───────────────────────
   private buildForm(): FormGroup {
-    const hasBullets = ['WORK_EXPERIENCE', 'EDUCATION', 'PROJECTS', 'VOLUNTEER'].includes(this.sectionType);
-    const hasCustomDetails = ['WORK_EXPERIENCE', 'PROJECTS'].includes(this.sectionType);
-
-    const base: Record<string, unknown> = hasBullets
-      ? { bullets: this.fb.array([this.fb.control('')]) }
-      : {};
-
-    if (hasCustomDetails) {
-      base['customDetails'] = this.fb.array([this.createDetailGroup()]);
-    }
-
     const fields: Record<SectionType, Record<string, unknown>> = {
-      WORK_EXPERIENCE:  { company: ['', Validators.required], title: ['', Validators.required], location: [''], summary: [''], technologiesRaw: [''], startDate: ['', Validators.required], endDate: [''], current: [false] },
-      EDUCATION:        { school: ['', Validators.required], degree: ['', Validators.required], field: [''], gpa: [''], startDate: [''], endDate: [''] },
+      WORK_EXPERIENCE:  { company: ['', Validators.required], title: ['', Validators.required], location: [''], startDate: ['', Validators.required], endDate: [''], current: [false], description: [''] },
+      EDUCATION:        { school: ['', Validators.required], degree: ['', Validators.required], field: [''], gpa: [''], startDate: [''], endDate: [''], description: [''] },
       SKILLS:           { category: ['', Validators.required], skillsRaw: ['', Validators.required] },
-      PROJECTS:         { name: ['', Validators.required], url: [''], summary: [''], technologiesRaw: [''], startDate: [''], endDate: [''], current: [false] },
+      PROJECTS:         { name: ['', Validators.required], url: [''], startDate: [''], endDate: [''], current: [false], description: [''] },
       CERTIFICATIONS:   { name: ['', Validators.required], issuer: [''], date: [''], url: [''] },
       AWARDS:           { title: ['', Validators.required], issuer: [''], date: [''], description: [''] },
       LANGUAGES:        { language: ['', Validators.required], proficiency: [''] },
-      VOLUNTEER:        { organization: ['', Validators.required], role: [''], startDate: [''], endDate: [''], current: [false] },
+      VOLUNTEER:        { organization: ['', Validators.required], role: [''], startDate: [''], endDate: [''], current: [false], description: [''] },
     };
 
-    return this.fb.group({ ...fields[this.sectionType], ...base });
+    return this.fb.group(fields[this.sectionType]);
   }
 
   private patchForm(data: Record<string, unknown>): void {
-    // Patch bullets separately (FormArray)
-    if (data['bullets'] && Array.isArray(data['bullets'])) {
-      const bullets = data['bullets'] as string[];
-      while (this.bulletsArray.length < bullets.length) {
-        this.bulletsArray.push(this.fb.control(''));
-      }
-      this.bulletsArray.patchValue(bullets);
-    }
+    const patch = { ...data };
 
     // Skills array → comma string for editing
     if (this.sectionType === 'SKILLS' && Array.isArray(data['skills'])) {
-      (data as Record<string, unknown>)['skillsRaw'] = (data['skills'] as string[]).join(', ');
+      patch['skillsRaw'] = (data['skills'] as string[]).join(', ');
     }
 
-    if (this.supportsCustomDetails && Array.isArray(data['customDetails'])) {
-      const details = data['customDetails'] as Array<{ label?: string; value?: string }>;
-      while (this.customDetailsArray.length < details.length) {
-        this.customDetailsArray.push(this.createDetailGroup());
-      }
-      this.customDetailsArray.patchValue(details);
+    if (this.usesDescription) {
+      patch['description'] = this.foldLegacyIntoDescription(data);
     }
 
-    if (this.sectionType === 'WORK_EXPERIENCE' || this.sectionType === 'PROJECTS') {
-      const technologies = data['technologies'];
-      if (Array.isArray(technologies)) {
-        (data as Record<string, unknown>)['technologiesRaw'] = technologies.join(', ');
-      }
-    }
-
-    this.form.patchValue(data);
+    this.form.patchValue(patch);
   }
 
-  private createDetailGroup(): FormGroup {
-    return this.fb.group({
-      label: [''],
-      value: [''],
-    });
+  /**
+   * Builds the description box's initial text for an entry saved before the
+   * forms were simplified.
+   *
+   * Those rows carry `summary`, `technologies`, `bullets`, and `customDetails`
+   * and no `description`; there is no database migration, so they are still out
+   * there. Showing the description box empty would look like the entry had lost
+   * its content, and saving would then genuinely lose it. Flattening the old
+   * fields into editable prose mirrors what describeEntry() in
+   * backend/src/lib/profileExport.ts already sends to the AI, so what the user
+   * sees is what the resume is written from.
+   */
+  private foldLegacyIntoDescription(data: Record<string, unknown>): string {
+    const existing = typeof data['description'] === 'string' ? data['description'].trim() : '';
+
+    const technologies = Array.isArray(data['technologies'])
+      ? (data['technologies'] as string[]).filter(Boolean)
+      : [];
+
+    const details = Array.isArray(data['customDetails'])
+      ? (data['customDetails'] as Array<{ label?: string; value?: string }>)
+          .filter(d => d.label?.trim() && d.value?.trim())
+          .map(d => `${d.label!.trim()}: ${d.value!.trim()}`)
+      : [];
+
+    const bullets = Array.isArray(data['bullets'])
+      ? (data['bullets'] as string[]).map(b => b.trim()).filter(Boolean)
+      : [];
+
+    return [
+      existing,
+      typeof data['summary'] === 'string' ? data['summary'].trim() : '',
+      technologies.length ? `Technologies: ${technologies.join(', ')}` : '',
+      details.join('. '),
+      bullets.join('\n'),
+    ].filter(Boolean).join('\n\n');
   }
 }

@@ -7,6 +7,11 @@ import {
 } from "./geminiRetry.js";
 import { parseAndValidateResumeOutput } from "./resumeSchemaValidation.js";
 import type { TailorResumeInput } from "./jobPost.js";
+import { buildReviewSchema, reportSkillAudit } from "./skillAudit.js";
+import {
+  buildFillBudgetBlock,
+  type ResumeFillReport,
+} from "./resumeRender.js";
 import "dotenv/config";
 
 import { GoogleGenAI } from "@google/genai";
@@ -20,11 +25,21 @@ export type { TailorResumeInput } from "./jobPost.js";
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-export async function finalResume(input: Prisma.InputJsonObject, input2: TailorResumeInput): Promise<Prisma.InputJsonObject> {
+export async function finalResume(
+  input: Prisma.InputJsonObject,
+  input2: TailorResumeInput,
+  draftFill: ResumeFillReport | null = null,
+  // Prefix for the skill-audit log. Builds run concurrently, so the caller
+  // passes the same short job id its timing lines carry.
+  logLabel = "[resume-review]",
+): Promise<Prisma.InputJsonObject> {
   const [selectedTemplate, resumeSchema] = await Promise.all([
     loadResumeTemplate(input2.templateId),
     loadResumeSchema(),
   ]);
+
+  const reviewSchema = buildReviewSchema(resumeSchema);
+  const fillBudgetBlock = buildFillBudgetBlock(draftFill);
 
   const jobPost = input2.jobPost;
   const fromUrl = jobPost.kind === "url";
@@ -93,8 +108,10 @@ achievement associated with that field relevant.
 
 ${unretrievableNote}
 
+${fillBudgetBlock}
+
 Run all five passes below as internal reasoning. Do not output the critique.
-Output only the revised resume JSON.
+Output only the revised resume JSON and its "skillAudit" property.
 
 PASS 1 — TRUTH AND FIELD-BY-FIELD PROVENANCE.
 
@@ -114,6 +131,50 @@ A claim is supported only when it appears in the specific matching profile
 entry to which the draft assigns it. A fact appearing elsewhere in the profile
 does not support transferring it to another entry.
 
+ENTRY-SCOPED FACTS VERSUS AGGREGATE FACTS.
+
+The rule above governs ENTRY-SCOPED facts: a location, date, GPA, employer,
+role, job title, metric, outcome, or responsibility. Each belongs to exactly one
+profile entry, and the draft moving one to a different entry makes the resume
+false. Nothing below relaxes that.
+
+A skill or technology is an AGGREGATE fact. Command of a tool is demonstrated by
+every entry that used it; it is not owned by any single entry. A technical
+skills section is an index over the whole profile, so a skill in it is supported
+when ANY part of the verified profile names it — a SKILLS entry, a
+"Technologies:" list inside a work or project description, a role or project
+summary, an accomplishment bullet, or education coursework. It does not have to
+come from a SKILLS entry, and the SKILLS entries are not a ceiling on what the
+section may contain.
+
+Do not treat a skill as unsupported merely because the draft drew it from
+somewhere other than a SKILLS entry. That is the intended behaviour of the
+drafting stage, not a defect to correct.
+
+This exception is scoped to the technical skills section and to the NAMES of
+skills and technologies. It never licenses a location, date, GPA, employer,
+metric, or achievement moving between entries, and it never licenses attributing
+a technology to a work or project entry that does not name it.
+
+THE TECHNICAL SKILLS SECTION IS AUDITED, NOT EDITED FOR GROUNDING.
+
+This review is being used to measure how well the drafting stage grounds the
+skills it writes. For the technical skills section only, suspend the
+delete-on-doubt behaviour:
+
+  - Keep every skill the draft listed, including any you judge ungrounded.
+  - Do not remove, replace, or soften a skill on grounding grounds.
+  - Record your verdict on each one in "skillAudit" instead, as described under
+    SKILL GROUNDING AUDIT below.
+
+You may still reorder skills, regroup them into better categories, align their
+spelling with the posting, and add relevant skills the draft missed. What you
+may not do is drop one because you could not ground it. Report it instead.
+
+This suspension applies to nothing else. Every other section is edited normally,
+and unsupported locations, GPAs, dates, metrics, employers, achievements, and
+URLs are still deleted exactly as required below.
+
 For every retained resume entry:
 
   1. Match it to one specific source entry in the verified profile.
@@ -124,12 +185,21 @@ For every retained resume entry:
 If the source entry is ambiguous or cannot be identified, fail closed: remove
 the unsupported claim instead of assuming that it is correct.
 
+The one exception is a skill in the technical skills section. There, fail open
+and report: keep the skill, and record it in "skillAudit" with "grounded" set to
+false.
+
 A missing, omitted, null, undefined, or empty profile value means "not
 provided." Never complete it with a plausible value.
 
-Never invent, infer, transfer, or complete a skill, technology, project,
-employer, role, location, work arrangement, credential, date, GPA, grade,
-metric, achievement, responsibility, or outcome.
+Never invent, infer, transfer, or complete a project, employer, role, location,
+work arrangement, credential, date, GPA, grade, metric, achievement,
+responsibility, or outcome.
+
+Never add a skill or technology that no part of the profile names. Listing a
+skill in the technical skills section on the strength of a different entry is
+aggregation and is allowed; attaching a technology to a work or project entry
+that does not name it is a transfer and is not.
 
 Correct invented numbers to the matching profile entry's exact figures or
 remove them.
@@ -309,8 +379,23 @@ This ordering is subordinate to actual job relevance. A directly relevant
 project is more valuable than unrelated employment, and a directly relevant
 credential is more valuable than an unrelated project.
 
-Do not restore a project, skill list, award, or other weaker item when stronger
-evidence already demonstrates the same qualification.
+This ordering ranks EVIDENCE that a requirement is met. It does not rank the
+technical skills section, which is an index rather than evidence. A posting that
+names technologies wants that index, and the experience entries that ground a
+skill do not make listing it redundant.
+
+Do not restore a project, award, or other weaker item when stronger evidence
+already demonstrates the same qualification. That rule applies between competing
+experience items, not to the technical skills section.
+
+The profile's forms deliberately collect free-form prose rather than
+pre-written bullets. A work, project, volunteer, or education entry carries one
+"description" the user wrote in plain sentences, at whatever length they chose,
+with no formatting. It is raw material, never resume copy: never paste a
+description onto the resume verbatim, and never treat its lack of structure as
+a lack of content. Read it closely, find every distinct accomplishment,
+responsibility, technology, course, award, and outcome inside it, and write
+each one that earns a place as its own bullet in this posting's vocabulary.
 
 Split any bullet that incorrectly compresses multiple distinct accomplishments.
 Do not duplicate the same fact in multiple locations.
@@ -320,7 +405,7 @@ ENTRY-DEPTH CHECK.
 For every directly relevant selected project or experience, identify all
 distinct verified accomplishments supplied by the profile.
 
-Normally retain 2-4 substantive bullets for a major relevant project when the
+Normally retain 3-5 substantive bullets for a major relevant project when the
 profile supports them.
 
 Restore important implementation, testing, design, security, collaboration,
@@ -358,8 +443,10 @@ PASS 3 — SECTION DESIGN.
 Reconsider the resume structure after selecting the most job-relevant facts.
 You may create, remove, rename, and reorder sections.
 
-Use as few non-empty sections as necessary, commonly 2-5. There is no minimum
-section count.
+Use as many non-empty sections as the posting and verified profile genuinely
+support, commonly 3-6. Prefer fewer strong sections over padding with weak ones,
+but do not collapse distinct kinds of evidence into one section merely to be
+brief.
 
 Every section must use one of these schema-supported types:
 
@@ -379,12 +466,13 @@ most natural relevant section or omit it.
 
 Every section must earn its place:
 
-  - Projects and Technical Skills are optional section choices, not default
-    resume sections.
+  - Projects is an optional section choice, not a default resume section.
   - Retain Projects when they provide direct evidence of core responsibilities
     or qualifications.
-  - Retain Technical Skills when specific technologies materially help evaluate
-    the candidate.
+  - Retain a Technical Skills section whenever the posting names technologies,
+    tools, languages, frameworks, platforms, or methods. Build it from the whole
+    profile rather than from its SKILLS entries alone, and put the posting's own
+    technologies first when the profile names them.
   - Remove Awards or Distinctions when they are impressive but not sufficiently
     relevant to this posting.
   - Avoid weak one-item sections unless the item represents a central
@@ -439,12 +527,20 @@ programming languages.
 
 PASS 5 — ONE-PAGE CONTENT SELECTION.
 
-There is no minimum section, bullet, or content-item count. Use only the amount
-of material needed to present the candidate's strongest job-relevant match.
+The revised resume must fill substantially one whole page. A page left a third
+empty is a failed revision, however truthful and well-targeted its content is.
 
-Most resumes will contain approximately 8-18 substantive bullets or equivalent
-content items across approximately 2-5 sections. These are broad ranges, not
-targets or quotas.
+Most resumes will contain approximately 22-34 substantive bullets or equivalent
+content items across approximately 3-6 sections. Treat the lower end as a floor
+to clear rather than a target to stop at. Fall below it only when the verified
+profile genuinely does not contain enough relevant material to reach it.
+
+Never close a gap by inventing, padding, or stretching a fact. Close it with
+verified profile material the draft left out, and by giving the strongest
+entries their full supported detail.
+
+When the measured page coverage block above is present, its percentage is the
+authority on length and the bullet range here is only a rough guide.
 
 Relevance is a gate; impressiveness is only a tie-breaker.
 
@@ -457,19 +553,21 @@ the least relevant sections and entries. Then preserve enough distinct bullets
 to make the strongest projects and experiences convincing.
 
 A major project with several relevant verified accomplishments should normally
-receive 2-4 substantive bullets.
+receive 3-5 substantive bullets.
 
-The revision should be shorter whenever removing indirect, repetitive,
-prestige-only, or lower-value evidence makes the strongest qualifications
-easier to identify.
+Length is not itself an improvement. Remove indirect, repetitive, or
+prestige-only evidence because that evidence is weak, never because a shorter
+resume is better. Treat the draft's length as a floor: when you delete
+something, refill the space it occupied with stronger supported material from
+the verified profile, so the revision fills the page at least as well as the
+draft did.
 
 Delete supported material when:
   - stronger and more direct evidence already demonstrates the same requirement;
   - it is only loosely connected to the posting;
   - it is impressive but not materially relevant;
   - it creates an unnecessary section;
-  - it distracts from directly relevant experience or projects;
-  - it exists primarily to fill page space.
+  - it distracts from directly relevant experience or projects.
 
 Before finalizing, check:
   - Does every section materially strengthen this application?
@@ -479,12 +577,49 @@ Before finalizing, check:
   - Did it retain a weak section while reducing a strong project to one vague
     bullet?
   - Is any qualification repeated through weaker evidence?
+  - Does the revision fill one page, or does it leave the page partly empty
+    while relevant verified material sits unused in the profile?
 
-Whitespace is preferable to weak, repetitive, indirectly related, or
-prestige-only content.
+An unsupported or irrelevant claim is worse than blank space. Blank space is
+worse than a relevant verified fact left sitting unused in the profile. If the
+revision would leave the page noticeably short, keep working: add the supported
+material the draft passed over until the page is full.
+
+SKILL GROUNDING AUDIT.
+
+Return a root property "skillAudit": an array holding one row for every distinct
+skill or technology named in the revised resume's technical skills section, in
+the order the section lists them.
+
+Each row is:
+
+  {
+    "skill":    the skill exactly as the revised resume prints it;
+    "section":  the "id" of the section it appears in;
+    "grounded": true when some part of the verified profile names this skill,
+                false when nothing in the profile names it;
+    "evidence": when grounded, the profile entry that names it, quoted closely
+                enough that a reader can find it — for example
+                "WORK_EXPERIENCE 'Backend Developer — Acme': Technologies:
+                PostgreSQL". When not grounded, the empty string;
+    "note":     optional. Use it when the resume's spelling differs from the
+                profile's, such as "profile says 'Postgres'", or to say briefly
+                why the skill could not be grounded.
+  }
+
+Judge grounding against the verified profile alone. The draft listing a skill is
+not evidence that the profile contains it.
+
+If the revised resume has no technical skills section, return an empty array.
+
+"skillAudit" is diagnostic output. It is logged and then stripped before the
+resume is rendered or saved, so recording a skill as ungrounded must not change
+what the resume itself contains.
 
 STRUCTURAL RULES.
 
+  - Return "skillAudit" as described under SKILL GROUNDING AUDIT, and keep every
+    skill in the resume regardless of its verdict.
   - Preserve the required root and header property names.
   - Preserve "jobPostTitle" as the exact job title from the posting and correct
     it if the draft is wrong.
@@ -547,9 +682,19 @@ The JSON response schema is authoritative if any structural ambiguity remains.
       // Only the URL path needs retrieval; pasted text is already complete.
       tools: fromUrl ? [{ type: "url_context" as const }] : [],
 
-      response_format: {type: "text", mime_type: "application/json", schema: resumeSchema,},
+      response_format: {type: "text", mime_type: "application/json", schema: reviewSchema,},
     });
 
-    return parseAndValidateResumeOutput(interaction.output_text, resumeSchema);
+    const reviewed = parseAndValidateResumeOutput(
+      interaction.output_text,
+      reviewSchema,
+    );
+
+    // The audit is diagnostic only. Log it, then drop it, so the PDF generator
+    // and the saved resume row see exactly the shape they saw before.
+    const { skillAudit, ...resume } = reviewed as Record<string, unknown>;
+    reportSkillAudit(skillAudit, logLabel);
+
+    return resume as Prisma.InputJsonObject;
   });
 }

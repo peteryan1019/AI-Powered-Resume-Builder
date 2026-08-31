@@ -68,6 +68,49 @@ function joinTechnologies(technologies: unknown): string {
   return values.length > 0 ? `Technologies: ${values.join(', ')}` : '';
 }
 
+/**
+ * Joins parts into one sentence-separated string without doubling terminal
+ * punctuation.
+ *
+ * The parts used to be short field values that rarely ended in a period, so a
+ * plain join('. ') was fine. A user-written description almost always ends in
+ * one, which produced "Mentored three developers.. Ran weekly code reviews."
+ * Adding the separator only when the previous part does not already end in
+ * '.', '!', '?', or ':' keeps the exported profile clean for the AI to read.
+ */
+function joinSentences(parts: unknown[]): string {
+  return parts
+    .filter((part): part is string => typeof part === 'string' && part.trim() !== '')
+    .map((part) => part.trim())
+    .reduce((acc, part) => (acc === '' ? part : `${acc}${/[.!?:]$/.test(acc) ? ' ' : '. '}${part}`), '');
+}
+
+/**
+ * Reads the one free-text field the simplified profile forms collect.
+ *
+ * The forms used to collect a role summary, a comma-separated technologies
+ * list, a bullet array, and labelled custom details as four separate inputs.
+ * They now collect a single `description` the user writes freely, which the
+ * resume AI turns into bullets at generation time.
+ *
+ * Instances saved before that change have no `description` and still carry
+ * `summary`, `technologies`, `bullets`, and `customDetails`. Both shapes are
+ * read here and concatenated, so an existing profile keeps exporting exactly
+ * what it always did and no database migration is needed. A row saved by the
+ * new form has only `description`, so nothing legacy is appended.
+ */
+function describeEntry(d: Record<string, any>): string {
+  const description = typeof d.description === 'string' ? d.description.trim() : '';
+
+  return joinSentences([
+    description,
+    d.summary,
+    joinTechnologies(d.technologies),
+    joinCustomDetails(d.customDetails),
+    joinBullets(d.bullets),
+  ]);
+}
+
 function joinCustomDetails(details: unknown): string {
   if (!Array.isArray(details)){
     return '';
@@ -91,7 +134,7 @@ function joinCustomDetails(details: unknown): string {
 function formatWorkExperience(d: Record<string, any>): { title: string; date: string; description: string } {
   const title = [d.title, d.company].filter(Boolean).join(' — ');
   const date = dateRange(d.startDate, d.endDate, d.current);
-  const description = [d.location, d.summary, joinTechnologies(d.technologies), joinBullets(d.bullets)].filter(Boolean).join('. ');
+  const description = joinSentences([d.location, describeEntry(d)]);
   return { title, date, description };
 }
 
@@ -99,7 +142,7 @@ function formatEducation(d: Record<string, any>): { title: string; date: string;
   const degreeAndField = [d.degree, d.field ? `in ${d.field}` : null].filter(Boolean).join(' ');
   const title = [degreeAndField, d.school].filter(Boolean).join(' — ');
   const date = dateRange(d.startDate, d.endDate);
-  const description = [joinBullets(d.bullets), d.gpa ? `GPA: ${d.gpa}` : null].filter(Boolean).join('. ');
+  const description = joinSentences([describeEntry(d), d.gpa ? `GPA: ${d.gpa}` : null]);
   return { title, date, description };
 }
 
@@ -112,7 +155,7 @@ function formatSkills(d: Record<string, any>): { title: string; date: string; de
 function formatProjects(d: Record<string, any>): { title: string; date: string; description: string } {
   const title = d.name ?? '';
   const date = dateRange(d.startDate, d.endDate, d.current);
-  const description = [d.url, d.summary, joinTechnologies(d.technologies), joinCustomDetails(d.customDetails), joinBullets(d.bullets)].filter(Boolean).join('. ');
+  const description = joinSentences([d.url, describeEntry(d)]);
   return { title, date, description };
 }
 
@@ -139,7 +182,7 @@ function formatLanguages(d: Record<string, any>): { title: string; date: string;
 function formatVolunteer(d: Record<string, any>): { title: string; date: string; description: string } {
   const title = [d.role ?? 'Volunteer', d.organization].filter(Boolean).join(' — ');
   const date = dateRange(d.startDate, d.endDate, d.current);
-  const description = joinBullets(d.bullets);
+  const description = describeEntry(d);
   return { title, date, description };
 }
 

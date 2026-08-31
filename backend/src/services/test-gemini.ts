@@ -122,6 +122,32 @@ A candidate fact is supported only when it appears in the matching profile
 entry from which the resume entry is derived. The fact merely appearing
 somewhere else in the profile is not sufficient support.
 
+ENTRY-SCOPED FACTS VERSUS AGGREGATE FACTS.
+
+The rule above governs ENTRY-SCOPED facts: a location, date, GPA, employer,
+role, job title, metric, outcome, or responsibility. Each of those belongs to
+exactly one profile entry, and moving one to a different entry makes the resume
+false. Nothing below relaxes that.
+
+A skill or technology is an AGGREGATE fact. Command of a tool is demonstrated by
+every entry that used it; it is not owned by any single entry. A technical
+skills section is by definition an index over the whole profile, and it is the
+one place where drawing on many entries at once is required rather than
+forbidden.
+
+A skill or technology may therefore appear in the technical skills section when
+ANY part of the verified profile names it — a SKILLS entry, a "Technologies:"
+list inside a work or project description, a role or project summary, an
+accomplishment bullet, or education coursework. It does not have to come from a
+SKILLS entry, and the SKILLS entries are not a ceiling on what the section may
+contain.
+
+This exception is scoped to the technical skills section and to the NAMES of
+skills and technologies. It never licenses moving a location, date, GPA,
+employer, metric, or achievement between entries, it never licenses attributing
+a technology to a work or project entry that does not name it, and it never
+licenses a skill that no part of the profile names.
+
 Preserve fact ownership:
 
   - A profile/header location describes the candidate generally. It is not the
@@ -132,8 +158,11 @@ Preserve fact ownership:
     experience.
   - A GPA belonging to one education record may not be applied to another
     education record.
-  - A job title, date, technology, metric, or achievement belonging to one
-    entry may not be reassigned to another entry.
+  - A job title, date, metric, or achievement belonging to one entry may not be
+    reassigned to another entry.
+  - A technology named by one entry may not be attributed to a different work,
+    project, or education entry. It may still be listed in the technical skills
+    section, which indexes the whole profile.
 
 A missing, omitted, null, undefined, or empty source value means "not
 provided." It does not mean "infer a likely value."
@@ -214,6 +243,22 @@ languages, and any custom information.
 Each profile section may contain several accomplishments combined inside one
 "description" string. Split those accomplishments apart internally and
 consider each one separately.
+
+The profile's forms deliberately collect free-form prose rather than
+pre-written bullets. A work, project, volunteer, or education entry carries one
+"description" the user wrote in plain sentences, at whatever length they chose,
+with no formatting. It is raw material, never resume copy: never paste a
+description onto the resume verbatim, and never treat its lack of structure as
+a lack of content. Read it closely, find every distinct accomplishment,
+responsibility, technology, course, award, and outcome inside it, and write
+each one that earns a place as its own bullet in this posting's vocabulary.
+
+Do the same for skills. A description may carry technology names in a
+"Technologies:" list, in ordinary prose, inside an accomplishment bullet, or
+inside education coursework. Harvest every technology, language, framework,
+library, platform, tool, and named method the profile mentions anywhere,
+together with the entry that mentions it. That harvested set — not the SKILLS
+entries alone — is the pool the technical skills section is written from.
 
 Exhaustive evaluation does not mean exhaustive inclusion. Examine every
 profile fact, but include only evidence that materially strengthens this
@@ -315,14 +360,20 @@ discarding distinct accomplishments within a selected high-value project or
 experience.
 
 Use only verified facts from the matching profile entry. Never invent, infer,
-transfer, or complete a skill, technology, project, employer, role, location,
-work arrangement, credential, date, GPA, grade, metric, achievement,
-responsibility, or outcome.
+transfer, or complete a project, employer, role, location, work arrangement,
+credential, date, GPA, grade, metric, achievement, responsibility, or outcome.
+
+Never invent a skill or technology that no part of the profile names. Listing a
+skill in the technical skills section on the strength of a different entry is
+aggregation and is allowed; attaching a technology to a work or project entry
+that does not name it is a transfer and is not.
 
 STEP 3 — CREATE THE SECTION STRUCTURE.
 
-Organize the selected facts into as few non-empty sections as necessary,
-commonly 2-5. There is no minimum section count.
+Organize the selected facts into as many non-empty sections as the posting and
+verified profile genuinely support, commonly 3-6. Prefer fewer strong sections
+over padding with weak ones, but do not collapse distinct kinds of evidence into
+one section merely to be brief.
 
 Create, omit, rename, and order sections according to their usefulness for the
 posting. The profile's original categories and the resume's displayed sections
@@ -349,8 +400,9 @@ Every section must earn its place:
 
   - Include Projects when selected projects directly demonstrate core
     responsibilities or qualifications from the posting.
-  - Include Technical Skills when the posting requests specific technologies
-    or when the skills materially help evaluate the candidate.
+  - Include a Technical Skills section whenever the posting names
+    technologies, tools, languages, frameworks, platforms, or methods, and
+    build it from the whole profile rather than from the SKILLS entries alone.
   - Include Awards or Distinctions only when the actual achievements materially
     support this posting, not merely because they are prestigious.
   - Include certifications, languages, volunteer work, teaching, and leadership
@@ -405,7 +457,7 @@ the weaker section and use the space to explain the stronger evidence.
 
 When a selected project directly supports core requirements and the profile
 contains multiple distinct verified accomplishments, normally give that
-project 2-4 substantive bullets.
+project 3-5 substantive bullets.
 
 Use one substantive bullet only when:
   - the project or entry is secondary;
@@ -416,9 +468,46 @@ Do not reduce a major relevant project to one vague bullet while retaining a
 less relevant section. Do not compress distinct implementation, testing,
 security, collaboration, design, and outcome facts into one generic bullet.
 
-For a technical-skills section, use "label" for the category, such as
-"Languages:", and "text" for the comma-separated values. Put technologies named
-in the posting first, but only when the profile supports them.
+BUILDING THE TECHNICAL SKILLS SECTION.
+
+Use "label" for the category, such as "Languages:", and "text" for the
+comma-separated values.
+
+Build the section by this procedure. Do not build it by copying the profile's
+SKILLS entries.
+
+  1. List every technology, tool, language, framework, library, platform,
+     method, and named practice the posting asks for.
+  2. For each one, search the ENTIRE verified profile for a mention: work
+     experience, projects, education coursework, certifications, volunteer
+     work, and SKILLS entries alike. Mark it covered or uncovered.
+  3. Write the covered ones first, in the posting's own order of emphasis.
+  4. Then add the profile's remaining skills that are genuinely useful for this
+     role. Omit the rest; this section is a targeted index, not an inventory.
+  5. Name the categories using the posting's own vocabulary when the posting
+     names its categories; otherwise use plain ones such as "Languages:",
+     "Frameworks:", "Tools:", "Databases:".
+
+An uncovered posting requirement stays uncovered. Never add a technology that no
+part of the profile mentions in order to match the posting. That floor outranks
+every other instruction in this section.
+
+SPELLING ALIGNMENT.
+
+When the profile and the posting name the SAME technology with different
+spellings, print the posting's spelling: "Postgres" -> "PostgreSQL", "JS" ->
+"JavaScript", "k8s" -> "Kubernetes", "Github Actions" -> "GitHub Actions".
+
+This applies only when the two names denote the identical technology. Never
+treat any of these as the same thing: Java and JavaScript; C, C++, and C#; REST
+and GraphQL; MySQL and PostgreSQL; React and React Native; Node.js and Next.js.
+When in doubt, keep the profile's spelling.
+
+SIZE OF THE SECTION.
+
+Keep it to roughly 4-6 category lines. Its lines do not count toward the
+substantive-bullet range in STEP 5: a long skills list is not a substitute for
+filling the page with experience and project detail.
 
 Use "Spoken Languages:" for human languages so they are not confused with
 programming languages.
@@ -442,13 +531,19 @@ omit a verified URL merely to meet a suggested content count.
 
 STEP 5 — SELECT CONTENT FOR ONE PAGE.
 
-Create a focused one-page resume using only the amount of content justified by
-the posting and verified profile. There is no minimum section, bullet, or
-content-item count.
+Fill one page. The finished resume must occupy substantially the whole page.
+Every verified fact that genuinely strengthens this application belongs on it,
+and a page left a third empty is a failure, not a display of restraint.
 
-Most resumes will contain approximately 8-18 substantive bullets or equivalent
-content items across approximately 2-5 sections. These are broad ranges, not
-targets or quotas. Relevance determines the final length.
+Most resumes will contain approximately 22-34 substantive bullets or equivalent
+content items across approximately 3-6 sections. Treat the lower end as a floor
+to clear rather than a target to stop at. Fall below it only when the verified
+profile genuinely does not contain enough relevant material to reach it.
+
+Reaching that length by inventing, padding, or stretching a fact is forbidden,
+and is a worse failure than a short page. Reach it instead by including more of
+the verified profile's relevant material and by giving the strongest entries
+their full supported detail.
 
 Relevance is a gate; impressiveness is only a tie-breaker.
 
@@ -467,13 +562,18 @@ finalizing, check:
     several distinct relevant accomplishments?
   - Is any fact present primarily because it is impressive rather than relevant?
   - Is the same qualification demonstrated repeatedly by weaker evidence?
+  - Does the selected content fill one page, or has relevant verified material
+    been left out while the page stays partly empty?
 
 Prefer three strong bullets for a directly relevant project over an entire
 weakly relevant awards or distinctions section.
 
-Do not add a section or retain an item merely to fill space. Whitespace is
-preferable to indirect evidence, repeated qualifications, weakly related
-projects, generic skill lists, excessive compression, or smaller text.
+Never invent a section or a fact to fill space. When the page is not yet full,
+close the gap in this order: first give the directly relevant entries their
+remaining supported accomplishments, then restore supporting evidence from the
+profile that covers a requirement not yet demonstrated. Only unsupported,
+irrelevant, or genuinely repetitive material should be left out. Do not leave
+out a relevant verified fact that would have filled the page.
 
 STRUCTURAL RULES.
 

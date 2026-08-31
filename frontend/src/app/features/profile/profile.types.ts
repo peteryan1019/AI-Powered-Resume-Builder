@@ -62,26 +62,43 @@ export interface Profile {
 // These match the JSON stored in ProfileInstance.data.
 // Use these when building/reading instance forms.
 
-export interface WorkExperienceData {
+// The simplified forms collect one free-text `description` per entry instead of
+// a summary, a technologies list, and a bullet array. The resume AI turns that
+// prose into tailored bullet points at generation time.
+//
+// The legacy fields below are still declared because rows saved before the
+// simplification keep their old JSON in ProfileInstance.data — there is no
+// migration. Read them, never write them; backend/src/lib/profileExport.ts
+// merges both shapes when it exports a profile to the AI.
+interface LegacyEntryFields {
+  /** @deprecated superseded by `description` */
+  summary?: string;
+  /** @deprecated superseded by `description` */
+  technologies?: string[];
+  /** @deprecated superseded by `description` */
+  bullets?: string[];
+  /** @deprecated superseded by `description` */
+  customDetails?: Array<{ label: string; value: string }>;
+}
+
+export interface WorkExperienceData extends LegacyEntryFields {
   company: string;
   title: string;
   location?: string;
   startDate: string;   // 'YYYY-MM'
   endDate?: string;
   current: boolean;
-  bullets: string[];
-  summary?: string;
-  technologies?: string[];
+  description?: string;
 }
 
-export interface EducationData {
+export interface EducationData extends LegacyEntryFields {
   school: string;
   degree: string;
   field?: string;
   startDate: string;
   endDate?: string;
   gpa?: string;
-  bullets: string[];
+  description?: string;
 }
 
 export interface SkillsData {
@@ -89,16 +106,13 @@ export interface SkillsData {
   skills: string[];
 }
 
-export interface ProjectData {
+export interface ProjectData extends LegacyEntryFields {
   name: string;
-  summary?: string;
-  technologies?: string;
   url?: string;
   startDate?: string;
   endDate?: string;
   current: boolean;
-  bullets: string[];
-  customDetails?: Array<{label: string, value: string}>;
+  description?: string;
 }
 
 export interface CertificationData {
@@ -120,13 +134,13 @@ export interface LanguageData {
   proficiency?: string;
 }
 
-export interface VolunteerData {
+export interface VolunteerData extends LegacyEntryFields {
   organization: string;
   role?: string;
   startDate?: string;
   endDate?: string;
   current: boolean;
-  bullets: string[];
+  description?: string;
 }
 
 // Map SectionType → its data type
