@@ -16,6 +16,11 @@ import {
 import type { User } from "../../generated/prisma/client.js";
 
 const router = Router();
+// Retained temporarily only as migration reference. Build execution now lives
+// in resumeWorkflowRoutes + the BullMQ worker; this router is deliberately
+// never exported or mounted, so route ordering cannot reactivate the old
+// in-process Map/SSE-triggered implementation.
+const retiredBuildRouter = Router();
 
 // ---------------------------------------------------------------------------
 // Build jobs
@@ -203,7 +208,7 @@ async function runBuildPipeline(
 // Kick off a build: validate inputs, register a pending job, hand back a jobId
 // the client opens an SSE stream against. The posting comes in as either `URL`
 // (the normal path) or `jobDescription` (the paste fallback) — never both.
-router.post("/:userId/resumes", async (req: Request, res: Response) => {
+retiredBuildRouter.post("/:userId/resumes", async (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
     const { URL, templateId, jobDescription } = req.body;
@@ -291,7 +296,7 @@ router.post("/:userId/resumes", async (req: Request, res: Response) => {
   }
 });
 
-router.post(
+retiredBuildRouter.post(
   "/:userId/resumes/:jobId/retry",
   async (req: Request, res: Response) => {
     try {
@@ -349,7 +354,7 @@ router.post(
 // SSE stream: runs the pipeline for a previously-registered job and emits a
 // `state` event per stage, a final `complete` event carrying the resumeId, or
 // an `error` event with a message.
-router.get(
+retiredBuildRouter.get(
   "/:userId/resumes/:jobId/events",
   async (req: Request, res: Response) => {
     const { userId } = req.params;

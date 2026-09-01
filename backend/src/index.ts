@@ -8,7 +8,9 @@ import pg from 'pg';
 import cors from 'cors';
 import userRouter from './routes/user_routes.ts';
 import resumeAIRouter1 from './routes/resumeAI1.js';
+import resumeWorkflowRouter from './routes/resumeWorkflowRoutes.js';
 import authSession from "./auth/session.js";
+import { SESSION_TTL_SECONDS, sessionStore } from "./lib/sessionStore.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { LocalAuthError, requestLoginCode, verifyLoginCode } from './lib/localAuth.js';
 import { sendLoginCodeEmail } from './lib/mailer.js';
@@ -51,13 +53,23 @@ app.use(express.json());
 app.use(
   session({
     secret: process.env.SECRETKEY as string,
+    // Sessions live in Redis, not in this process's memory. express-session's
+    // default MemoryStore is per-process, so every deploy or restart discarded
+    // every session and signed all users out. Redis outlives the process.
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
+    // Re-send the cookie on every response so an active user's login keeps
+    // sliding forward instead of expiring a fixed time after they signed in.
+    rolling: true,
     cookie: {
       httpOnly: true,
       sameSite: "lax",
       // Send the cookie over HTTPS only in production (behind the TLS proxy).
       secure: process.env.NODE_ENV === "production",
+      // Without this the cookie died when the browser closed, which logged the
+      // user out regardless of where the session was stored.
+      maxAge: SESSION_TTL_SECONDS * 1000,
     },
   })
 );
@@ -109,6 +121,8 @@ const verifyCodeLimiter = rateLimit({
 
 // Mount the user routes
 app.use('/api/users', requireAuth, userRouter);
+// Asynchronous build commands/events are separate from saved-resume CRUD.
+app.use('/api/users', requireAuth, resumeWorkflowRouter);
 app.use('/api/users', requireAuth, resumeAIRouter1);
 
 app.get(

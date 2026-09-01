@@ -1,5 +1,12 @@
 export const FASTEST_GEMINI_TEXT_MODEL = "gemini-3.1-flash-lite";
 
+// The coach grades the draft, which is the one step worth a reasoning model.
+// Gemini 3.1 Pro is only published under the -preview id; plain
+// "gemini-3.1-pro" returns 404 from the API. It also needs a paid key:
+// the free-tier keys (APIKEY_1/2) return 429 for this model, which is why
+// the coach reads COACH_KEY rather than sharing APIKEY_2.
+export const COACH_GEMINI_MODEL = "gemini-3.1-pro-preview";
+
 const MAX_AI_MODEL_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 500;
 const JITTER_MS = 150;

@@ -15,7 +15,9 @@ import {
 import "dotenv/config";
 
 import { GoogleGenAI } from "@google/genai";
-const GEMINI_API_KEY = process.env.APIKEY_2;
+// This service performs the writer's revision pass. The independent coach uses
+// COACH_KEY in coach-gemini.ts and never rewrites the resume itself.
+const GEMINI_API_KEY = process.env.APIKEY_1;
 
 if (!GEMINI_API_KEY) {
   throw new Error("Request failed");
@@ -32,6 +34,7 @@ export async function finalResume(
   // Prefix for the skill-audit log. Builds run concurrently, so the caller
   // passes the same short job id its timing lines carry.
   logLabel = "[resume-review]",
+  requestedChanges = "",
 ): Promise<Prisma.InputJsonObject> {
   const [selectedTemplate, resumeSchema] = await Promise.all([
     loadResumeTemplate(input2.templateId),
@@ -68,15 +71,20 @@ following this prompt.`;
     ? `If the posting cannot be retrieved, proceed using the draft and verified
 profile alone.`
     : "";
+  const role = requestedChanges
+    ? `You are an expert resume writer revising a draft after the user approved
+specific coaching changes. Apply only the approved direction, while performing
+the truth, relevance, and one-page quality checks below.`
+    : `You are a senior hiring manager reviewing a DRAFT resume written for a
+specific job posting. Return a REVISED version that is strictly stronger, fully
+truthful, and better targeted.`;
 
   return retryAiModelRequest("finalize resume", async () => {
     const interaction = await ai.interactions.create({
       model: FASTEST_GEMINI_TEXT_MODEL,
 
 input: `
-You are a senior hiring manager reviewing a DRAFT resume written for a specific
-job posting. Return a REVISED version that is strictly stronger, fully truthful,
-and better targeted.
+${role}
 
 In this prompt, "stronger" means more useful and relevant for this specific
 job—not more prestigious, impressive, or extensive in general.
@@ -92,6 +100,14 @@ ${JSON.stringify(input2.userProfile, null, 2)}
 
 DRAFT RESUME UNDER REVIEW:
 ${JSON.stringify(input, null, 2)}
+
+USER-APPROVED COACHING CHANGES:
+${requestedChanges || "No specific changes were approved. Perform the normal truth and quality review."}
+
+The block above contains only choices the user approved. Apply those choices
+when they remain truthful according to the verified profile. A user's
+specification tells you what to select or emphasize; it never overrides the
+verified profile and never authorizes inventing a fact.
 
 ROOT SKELETON:
 ${JSON.stringify(selectedTemplate, null, 2)}
@@ -698,3 +714,6 @@ The JSON response schema is authoritative if any structural ambiguity remains.
     return resume as Prisma.InputJsonObject;
   });
 }
+
+/** Writer-facing name used by the LangGraph revision node. */
+export const reviseResume = finalResume;

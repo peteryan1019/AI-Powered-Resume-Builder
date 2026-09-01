@@ -6,6 +6,8 @@ This project is a simple full-stack resume builder setup with:
 - Express backend
 - Prisma ORM
 - PostgreSQL database running in Docker
+- Redis 8 for BullMQ jobs, LangGraph checkpoints, and progress streams
+- A separate resume worker process
 
 The current smoke test verifies that the frontend, backend, and database are connected correctly. When the test button is clicked, the frontend asks the backend to create a dummy user, the backend inserts that user into PostgreSQL, counts the total users, and sends the count back to the frontend.
 
@@ -135,6 +137,31 @@ The backend should start on:
 ```text
 http://localhost:3000
 ```
+
+The resume workflow also needs Redis. For local development, start Redis 8:
+
+```bash
+docker run --name resume-redis -p 6379:6379 -d redis:8.2-alpine
+```
+
+Add this to `backend/.env`:
+
+```env
+REDIS_URL="redis://localhost:6379"
+```
+
+Then start the asynchronous resume worker in a second backend terminal:
+
+```bash
+npm run dev:worker
+```
+
+The API enqueues only a build ID. The worker loads the build input from Redis,
+runs the LangGraph writer/coach workflow, pauses at coach feedback without
+holding a worker slot, and resumes from its Redis checkpoint after the user
+submits decisions. PostgreSQL stores only durable profile changes and the final
+resume; transient drafts, reviews, and progress events expire from Redis after
+three days.
 
 You can test the backend with:
 

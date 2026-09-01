@@ -55,6 +55,20 @@ services:
       start_period: 10s
     logging: *default-logging
 
+  redis:
+    image: redis:8.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    logging: *default-logging
+
   backend:
     image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
     container_name: backend
@@ -62,11 +76,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     expose:
       - 3000
     environment:
       NODE_ENV: production
       DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/resumebuilder"
+      REDIS_URL: "redis://redis:6379"
       SECRETKEY: "${SECRETKEY:?SECRETKEY must be set}"
       FRONTEND_URL: "${FRONTEND_URL:?FRONTEND_URL must be set}"
       BACKEND_URL: "${BACKEND_URL:?BACKEND_URL must be set}"
@@ -80,6 +97,27 @@ services:
       APIKEY_1: "${APIKEY_1}"
       APIKEY_2: "${APIKEY_2}"
       APIKEY_3: "${APIKEY_3}"
+      COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
+    logging: *default-logging
+
+  resume-worker:
+    image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
+    container_name: resume-worker
+    restart: unless-stopped
+    command: ["npx", "tsx", "src/resume-workflow/worker.ts"]
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/resumebuilder"
+      REDIS_URL: "redis://redis:6379"
+      RESUME_WORKER_CONCURRENCY: "${RESUME_WORKER_CONCURRENCY:-2}"
+      APIKEY_1: "${APIKEY_1}"
+      APIKEY_2: "${APIKEY_2}"
+      COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
     logging: *default-logging
 
   frontend:
@@ -97,3 +135,4 @@ services:
 
 volumes:
   pgdata:
+  redisdata:

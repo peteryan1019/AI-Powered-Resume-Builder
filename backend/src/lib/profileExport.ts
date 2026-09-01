@@ -24,6 +24,7 @@ export interface ExportedProfile {
     links: { linkedin: string | null; github: string | null; portfolio: string | null };
   };
   sections: Array<{
+    sourceId: string;
     type: SectionType;
     title: string;
     date: string;
@@ -199,8 +200,8 @@ const FORMATTERS: Record<SectionType, (data: Record<string, any>) => { title: st
 
 export function formatInstance(
   type: SectionType,
-  instance: Pick<ProfileInstance, 'data'>
+  instance: Pick<ProfileInstance, 'id' | 'data'>
 ): ExportedProfile['sections'][number] {
   const { title, date, description } = FORMATTERS[type](instance.data as Record<string, any>);
-  return { type, title, date, description };
+  return { sourceId: instance.id, type, title, date, description };
 }

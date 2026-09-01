@@ -4,12 +4,18 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 
 import { AuthService } from '../auth/auth.service';
-import { ResumeBuildService } from './resume-build.service';
+import {
+  NodeVisit,
+  ResumeBuildService,
+  WorkflowTopology,
+  foldTrace,
+} from './resume-build.service';
+import { RunTraceComponent } from './run-trace.component';
 
 @Component({
   selector: 'app-build-result-page',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterLink, RunTraceComponent],
   template: `
     <section class="result-page" *ngIf="pdfURL(); else missing">
       <header class="result-header">
@@ -53,6 +59,20 @@ import { ResumeBuildService } from './resume-build.service';
       <div class="preview">
         <iframe [src]="safepdfURL()" title="Generated resume preview"></iframe>
       </div>
+
+      <section class="how" *ngIf="traceLoaded()">
+        <h3 class="how-title">How this resume was built</h3>
+        <p class="how-sub" *ngIf="!visits().length">
+          {{ traceNote() }}
+        </p>
+        <app-run-trace
+          *ngIf="visits().length"
+          [topology]="topology()"
+          [visits]="visits()"
+          [completed]="true"
+          [unavailable]="graphError()"
+        />
+      </section>
     </section>
 
     <ng-template #missing>
@@ -156,6 +176,20 @@ import { ResumeBuildService } from './resume-build.service';
         background: rgba(140, 0, 255, 1);
         box-shadow: 0 12px 28px -16px rgba(122, 97, 255, 0.85);
       }
+      .how {
+        margin-top: 3rem;
+        padding-top: 2rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .how-title {
+        margin: 0 0 0.35rem;
+        font-size: 1.05rem;
+      }
+      .how-sub {
+        margin: 0 0 1.25rem;
+        font-size: 0.85rem;
+        color: rgba(244, 246, 255, 0.5);
+      }
       .preview {
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 1rem;
@@ -190,6 +224,13 @@ export class BuildResultPage implements OnInit {
   readonly pdfURL = signal<string | null>(null);
   readonly safepdfURL = signal<SafeResourceUrl | null>(null);
 
+  /** The build trace, replayed from Redis so it outlives the status page. */
+  readonly topology = signal<WorkflowTopology | null>(null);
+  readonly visits = signal<NodeVisit[]>([]);
+  readonly traceLoaded = signal(false);
+  readonly traceNote = signal('');
+  readonly graphError = signal<string | null>(null);
+
   ngOnInit(): void {
     const resumeId = this.route.snapshot.paramMap.get('jobId');
 
@@ -205,5 +246,30 @@ export class BuildResultPage implements OnInit {
 
     this.pdfURL.set(url);
     this.safepdfURL.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+
+    this.resumeBuild.getWorkflowGraph(userId).subscribe({
+      next: (topology) => this.topology.set(topology),
+      error: () => {
+        this.topology.set(null);
+        this.graphError.set('The workflow diagram is unavailable right now.');
+      },
+    });
+    this.resumeBuild.getRunTrace(userId, resumeId).subscribe({
+      next: ({ buildId, events }) => {
+        this.visits.set(foldTrace(events));
+        // A resume predating the workflow has no build; one whose Redis event
+        // stream has aged out has a build but no events. Say which.
+        this.traceNote.set(
+          buildId === null
+            ? 'This resume was created before the build workflow was recorded.'
+            : 'The step-by-step record of this build has expired.',
+        );
+        this.traceLoaded.set(true);
+      },
+      error: () => {
+        this.traceNote.set('The build record could not be loaded.');
+        this.traceLoaded.set(true);
+      },
+    });
   }
 }

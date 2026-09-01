@@ -35,6 +35,7 @@ model User {
 
 model Resume {
   id            String   @id @default(uuid())
+  buildId       String?  @unique
   userId        String
   title         String?
   templateId    String
@@ -165,6 +166,7 @@ model ProfileSection {
 // ─────────────────────────────────────────
 model ProfileInstance {
   id        String         @id @default(uuid())
+  sourceBuildKey String?    @unique
   sectionId String
   section   ProfileSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
 
