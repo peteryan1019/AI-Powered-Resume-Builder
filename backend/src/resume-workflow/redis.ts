@@ -131,9 +131,8 @@ export async function patchBuildMetadata(
 export async function putReviewProjection(
   buildId: string,
   review: CoachReview,
-  projectCandidates: ReviewProjection["projectCandidates"],
 ): Promise<void> {
-  await writeJson(buildReviewKey(buildId), { ...review, projectCandidates });
+  await writeJson(buildReviewKey(buildId), review);
 }
 
 export function getReviewProjection(

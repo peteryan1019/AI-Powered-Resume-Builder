@@ -20,7 +20,6 @@ function review(): CoachReview {
     passes: false,
     summary: 'Close.',
     criteria: [],
-    projectCandidates: [],
     recommendations: [
       {
         id: 'rec-a',

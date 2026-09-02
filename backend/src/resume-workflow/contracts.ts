@@ -4,7 +4,7 @@ import type { JobPostSource } from "../services/jobPost.js";
 
 export const WORKFLOW_VERSION = 1;
 export const COACH_PASS_SCORE = 90;
-export const MAX_COACH_ROUNDS = 3;
+export const MAX_COACH_ROUNDS = 5;
 
 export type BuildStatus =
   | "queued"
@@ -111,14 +111,12 @@ export interface ResumeWorkflowResumeInput {
   profileChanges?: ProfileChangeInput[];
 }
 
-export interface ReviewProjection extends CoachReview {
-  projectCandidates: Array<{
-    sourceId: string;
-    title: string;
-    date: string;
-    description: string;
-  }>;
-}
+/**
+ * What is stored for a published review. It used to add a list of the user's
+ * existing projects, for a "use a project already in my profile" dropdown that
+ * no longer exists -- the profile agent handles that from what the user writes.
+ */
+export type ReviewProjection = CoachReview;
 
 export interface ResumeWorkflowState {
   workflowVersion: number;

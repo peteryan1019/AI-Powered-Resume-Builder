@@ -34,7 +34,6 @@ export interface CoachReview {
   summary: string;
   criteria: CoachCriterion[];
   recommendations: CoachRecommendation[];
-  projectCandidates: Array<{ sourceId: string; title: string; date: string; description: string }>;
 }
 
 export interface RecommendationDecision {

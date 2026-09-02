@@ -170,15 +170,7 @@ async function publishReviewNode(state: State): Promise<Partial<State>> {
     "publish_review",
     state.round,
   );
-  const projectCandidates = state.profile.sections
-    .filter((section) => section.type === "PROJECTS")
-    .map(({ sourceId, title, date, description }) => ({
-      sourceId,
-      title,
-      date,
-      description,
-    }));
-  await putReviewProjection(state.buildId, state.review, projectCandidates);
+  await putReviewProjection(state.buildId, state.review);
   await patchBuildMetadata(state.buildId, { status: "awaiting_feedback" });
   await nodeEnded(state.buildId, "publish_review", state.round, startedAt);
   // human_review is a synchronous node built around LangGraph's interrupt(),
