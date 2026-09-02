@@ -171,6 +171,30 @@ export function foldTrace(events: RunTraceEvent[]): NodeVisit[] {
   return visits;
 }
 
+/** One build the user has started, whether it finished or is still waiting. */
+export interface BuildSession {
+  buildId: string;
+  status:
+    | 'queued'
+    | 'generating'
+    | 'checking'
+    | 'awaiting_feedback'
+    | 'revising'
+    | 'generating_pdf'
+    | 'done'
+    | 'error';
+  createdAt: string;
+  templateId: string;
+  /** What it was tailored against: a hostname, or the start of pasted text. */
+  jobPost: string;
+  resumeId?: string;
+  title?: string;
+  /** Present while awaiting feedback: which coaching round, and its score. */
+  round?: number;
+  score?: number;
+  errorMessage?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ResumeBuildService {
   private readonly http = inject(HttpClient);
@@ -219,6 +243,17 @@ export class ResumeBuildService {
   eventsUrl(userId: string, jobId: string, afterEventId?: string): string {
     const base = `${this.apiUrl}/users/${userId}/resumes/${jobId}/events`;
     return afterEventId ? `${base}?after=${encodeURIComponent(afterEventId)}` : base;
+  }
+
+  /**
+   * Every build this user has started, newest first within each status, with
+   * the ones waiting on them first. Builds expire after three days.
+   */
+  getSessions(userId: string): Observable<{ sessions: BuildSession[] }> {
+    return this.http.get<{ sessions: BuildSession[] }>(
+      `${this.apiUrl}/users/${userId}/resumes/sessions`,
+      { withCredentials: true },
+    );
   }
 
   /** The workflow's node/edge topology, for drawing the diagram. */

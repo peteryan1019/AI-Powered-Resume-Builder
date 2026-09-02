@@ -11,6 +11,7 @@ import { BuildStatusPage } from './features/resume-build/build-status-page';
 import { JobDescriptionPage } from './features/resume-build/job-description-page';
 import { BuildResultPage } from './features/resume-build/build-result-page';
 import { MyResumesPage } from './features/resume-build/my-resumes-page';
+import { SessionsPage } from './features/resume-build/sessions-page';
 import { paymentGuard } from './features/payments/payment.guard';
 import { ResumeEditorPage } from './features/resume-build/resume-editor-page';
 
@@ -33,6 +34,11 @@ export const routes: Routes = [
     canActivate: [authGuard, paymentGuard],
   },
   { path: 'tailor/result/:jobId', component: BuildResultPage, canActivate: [authGuard, paymentGuard] },
+  {
+    path: 'tailor/sessions',
+    component: SessionsPage,
+    canActivate: [authGuard, paymentGuard],
+  },
   { path: 'my-resumes/:resumeId/edit', component: ResumeEditorPage, canActivate: [authGuard] },
   { path: 'my-resumes', component: MyResumesPage, canActivate: [authGuard] },
   { path: 'resume-templates', component: ResumeTemplatesPage, canActivate: [] },

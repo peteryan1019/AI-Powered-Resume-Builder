@@ -42,6 +42,17 @@ export function buildEventsKey(buildId: string): string {
   return `resume:build:${buildId}:events`;
 }
 
+/**
+ * Every build a user has started, newest first. Builds are otherwise reachable
+ * only by their own id, so losing the page URL lost the build -- including one
+ * paused waiting for feedback. Scored by creation time and expiring with the
+ * same TTL as the builds themselves: an index outliving the state it points at
+ * would list sessions that cannot be resumed.
+ */
+export function userBuildsKey(userId: string): string {
+  return `resume:user:${userId}:builds`;
+}
+
 export async function acquireBuildLock(
   buildId: string,
   purpose: string,
@@ -104,7 +115,79 @@ export async function createBuildRecord(input: BuildInput): Promise<void> {
       "EX",
       WORKFLOW_TTL_SECONDS,
     )
+    .zadd(
+      userBuildsKey(input.userId),
+      new Date(input.createdAt).getTime(),
+      input.buildId,
+    )
+    .expire(userBuildsKey(input.userId), WORKFLOW_TTL_SECONDS)
     .exec();
+}
+
+/**
+ * Adds builds that predate the index, once per user.
+ *
+ * The index is written when a build is created, so builds that already existed
+ * when it shipped are absent -- including ones paused waiting for feedback,
+ * which are exactly the ones worth recovering. A marker key records that the
+ * scan has run so it happens once rather than on every read.
+ *
+ * This is a migration shim. Once no build older than WORKFLOW_TTL_SECONDS can
+ * still be alive, nothing it finds will exist and it can be deleted.
+ */
+async function backfillUserBuilds(userId: string, key: string): Promise<void> {
+  const marker = `${key}:backfilled`;
+  if (await redis.exists(marker)) return;
+
+  let cursor = "0";
+  do {
+    const [next, keys] = await redis.scan(
+      cursor,
+      "MATCH",
+      "resume:build:*:meta",
+      "COUNT",
+      200,
+    );
+    cursor = next;
+    for (const metaKey of keys) {
+      const raw = await redis.get(metaKey);
+      if (!raw) continue;
+      const metadata = JSON.parse(raw) as BuildMetadata;
+      if (metadata.userId !== userId) continue;
+      await redis.zadd(
+        key,
+        "NX",
+        new Date(metadata.createdAt).getTime(),
+        metadata.buildId,
+      );
+    }
+  } while (cursor !== "0");
+
+  await redis.expire(key, WORKFLOW_TTL_SECONDS);
+  await redis.set(marker, "1", "EX", WORKFLOW_TTL_SECONDS);
+}
+
+/**
+ * A user's builds, newest first, with ids whose state has expired pruned from
+ * the index as they are found. Self-healing beats a cleanup job: the only time
+ * anyone cares about a dead id is when reading the list.
+ */
+export async function listUserBuilds(
+  userId: string,
+  limit = 40,
+): Promise<BuildMetadata[]> {
+  const key = userBuildsKey(userId);
+  await backfillUserBuilds(userId, key);
+  const ids = await redis.zrevrange(key, 0, limit - 1);
+  const alive: BuildMetadata[] = [];
+  const expired: string[] = [];
+  for (const id of ids) {
+    const metadata = await getBuildMetadata(id);
+    if (metadata) alive.push(metadata);
+    else expired.push(id);
+  }
+  if (expired.length) await redis.zrem(key, ...expired);
+  return alive;
 }
 
 export function getBuildInput(buildId: string): Promise<BuildInput | null> {

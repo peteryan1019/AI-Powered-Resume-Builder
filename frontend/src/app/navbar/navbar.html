@@ -46,6 +46,10 @@
       </li>
 
       <li *ngIf="auth.isAuthenticated()">
+        <a routerLink="/tailor/sessions" routerLinkActive="active"> Build sessions </a>
+      </li>
+
+      <li *ngIf="auth.isAuthenticated()">
         <a routerLink="/my-resumes" routerLinkActive="active"> My resumes </a>
       </li>
     </ul>

@@ -5,6 +5,7 @@ import prisma from "../lib/prisma.js";
 import {
   WORKFLOW_VERSION,
   type BuildInput,
+  type BuildStatus,
   type ProfileChangeInput,
   type RecommendationDecision,
   type ResumeWorkflowResumeInput,
@@ -25,6 +26,7 @@ import {
   getBuildMetadata,
   getRedis,
   getReviewProjection,
+  listUserBuilds,
   readBuildEvents,
   patchBuildMetadata,
   putResumeCommand,
@@ -134,6 +136,101 @@ async function startBuild(
   }
   return buildId;
 }
+
+/** A short human label for what a build was tailored against. */
+function jobPostLabel(input: BuildInput | null): string {
+  if (!input) return "Job posting";
+  if (input.jobPost.kind === "url") {
+    try {
+      return new URL(input.jobPost.url).hostname.replace(/^www\./, "");
+    } catch {
+      return input.jobPost.url.slice(0, 60);
+    }
+  }
+  const text = input.jobPost.text.trim().replace(/\s+/g, " ");
+  if (!text) return "Pasted description";
+  return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+}
+
+/**
+ * Sort order for the sessions list: what needs the user first, then what is
+ * still working, then what broke, then what is finished. Recency only decides
+ * ties, because a build waiting on feedback matters more than a newer one that
+ * is merely running.
+ */
+function sessionRank(status: BuildStatus): number {
+  if (status === "awaiting_feedback") return 0;
+  if (status === "error") return 2;
+  if (status === "done") return 3;
+  return 1;
+}
+
+// Builds are otherwise reachable only by their own id, so closing the tab lost
+// one -- including a build paused waiting for feedback, which cannot be
+// restarted without abandoning the coaching rounds already spent on it.
+router.get(
+  "/:userId/resumes/sessions",
+  async (req: Request, res: Response) => {
+    const user = authenticatedOwner(req, res);
+    if (!user) return;
+
+    const builds = await listUserBuilds(user.id);
+    const finishedIds = builds
+      .map((build) => build.resumeId)
+      .filter((id): id is string => Boolean(id));
+    const titles = new Map(
+      (
+        await prisma.resume.findMany({
+          where: { id: { in: finishedIds }, userId: user.id },
+          select: { id: true, title: true },
+        })
+      ).map((resume) => [resume.id, resume.title]),
+    );
+
+    const sessions = await Promise.all(
+      builds.map(async (build) => {
+        // Every build of a given posting shares a hostname, so the label alone
+        // cannot tell six of them apart. A finished build has its resume title;
+        // for one paused on feedback, read the posting title out of the draft.
+        // Only for those: it is a checkpoint read, and they are the few rows
+        // the user has to choose between.
+        const waiting = build.status === "awaiting_feedback";
+        const [input, review, draft] = await Promise.all([
+          getBuildInput(build.buildId),
+          waiting ? getReviewProjection(build.buildId) : Promise.resolve(null),
+          waiting
+            ? getBuildDraft(build.buildId).catch(() => null)
+            : Promise.resolve(null),
+        ]);
+        const draftTitle =
+          typeof (draft as Record<string, unknown> | null)?.jobPostTitle === "string"
+            ? ((draft as Record<string, unknown>).jobPostTitle as string).trim()
+            : "";
+        return {
+          buildId: build.buildId,
+          status: build.status,
+          createdAt: build.createdAt,
+          templateId: build.templateId,
+          jobPost: jobPostLabel(input),
+          ...(draftTitle ? { title: draftTitle } : {}),
+          ...(build.resumeId ? { resumeId: build.resumeId } : {}),
+          ...(titles.get(build.resumeId ?? "")
+            ? { title: titles.get(build.resumeId ?? "")! }
+            : {}),
+          ...(review ? { round: review.round, score: review.overallScore } : {}),
+          ...(build.errorMessage ? { errorMessage: build.errorMessage } : {}),
+        };
+      }),
+    );
+
+    sessions.sort(
+      (a, b) =>
+        sessionRank(a.status) - sessionRank(b.status) ||
+        b.createdAt.localeCompare(a.createdAt),
+    );
+    return res.json({ sessions });
+  },
+);
 
 // The UI draws its workflow diagram from this, so the picture is generated
 // from the compiled graph the worker actually runs rather than a hand-kept
