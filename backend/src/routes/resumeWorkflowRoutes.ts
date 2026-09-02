@@ -5,7 +5,7 @@ import prisma from "../lib/prisma.js";
 import {
   WORKFLOW_VERSION,
   type BuildInput,
-  type NewProjectInput,
+  type ProfileChangeInput,
   type RecommendationDecision,
   type ResumeWorkflowResumeInput,
 } from "../resume-workflow/contracts.js";
@@ -31,6 +31,12 @@ import {
   releaseBuildLock,
 } from "../resume-workflow/redis.js";
 import { renderResume } from "../services/resumeRender.js";
+import {
+  PROFILE_SECTION_TYPES,
+  SECTION_FIELDS,
+  proposeProfileChanges,
+  type ProfileSectionType,
+} from "../services/profileAgent.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
 import type { JobPostSource } from "../services/jobPost.js";
 
@@ -289,39 +295,79 @@ function cleanOptionalString(value: unknown, max = 500): string | undefined {
   return cleaned ? cleaned.slice(0, max) : undefined;
 }
 
-function validateNewProject(value: unknown): NewProjectInput {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error("Enter the new project's details.");
-  }
+/** Section labels used when a section of that type does not exist yet. */
+const SECTION_LABELS: Record<ProfileSectionType, string> = {
+  WORK_EXPERIENCE: "Work Experience",
+  EDUCATION: "Education",
+  SKILLS: "Skills",
+  PROJECTS: "Projects",
+  CERTIFICATIONS: "Certifications",
+  AWARDS: "Awards",
+  LANGUAGES: "Languages",
+  VOLUNTEER: "Volunteer",
+};
+
+/**
+ * Validates one profile change the user confirmed. `data` may carry only the
+ * fields that section type's form accepts: the user filled that form, so
+ * anything else is not something they saw or approved. `skills` is allowed
+ * alongside them because the form turns its `skillsRaw` text into an array
+ * before emitting.
+ */
+function validateProfileChange(value: unknown): ProfileChangeInput {
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error("A profile change is invalid.");
   const raw = value as Record<string, unknown>;
-  const name = cleanOptionalString(raw.name, 200);
-  const description = cleanOptionalString(raw.description, 5_000);
-  if (!name || !description)
-    throw new Error("A new project needs a name and description.");
-  const url = cleanOptionalString(raw.url, 1_000);
-  if (url) {
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw new Error("The project URL is invalid.");
-    }
-    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      throw new Error("The project URL must use HTTP or HTTPS.");
+
+  const mode = raw.mode === "update" ? "update" : "create";
+  const sectionType =
+    typeof raw.sectionType === "string" ? raw.sectionType : "";
+  if (!PROFILE_SECTION_TYPES.includes(sectionType as ProfileSectionType))
+    throw new Error("That profile section type does not exist.");
+  const sourceId = cleanOptionalString(raw.sourceId, 100);
+  if (mode === "update" && !sourceId)
+    throw new Error("An edited profile entry must say which entry it is.");
+
+  const allowed = new Set([
+    ...SECTION_FIELDS[sectionType as ProfileSectionType],
+    "skills",
+  ]);
+  const source = (raw.data ?? {}) as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(source)) {
+    if (!allowed.has(key)) continue;
+    if (typeof item === "boolean") {
+      data[key] = item;
+    } else if (Array.isArray(item)) {
+      const list = item
+        .filter((entry): entry is string => typeof entry === "string")
+        .map((entry) => entry.trim().slice(0, 200))
+        .filter(Boolean);
+      if (list.length) data[key] = list;
+    } else {
+      const text = cleanOptionalString(item, 5_000);
+      if (text) data[key] = text;
     }
   }
+  if (!Object.keys(data).length)
+    throw new Error("That profile change has no details.");
+
   return {
-    name,
-    description,
-    ...(url ? { url } : {}),
-    ...(cleanOptionalString(raw.startDate, 30)
-      ? { startDate: cleanOptionalString(raw.startDate, 30)! }
-      : {}),
-    ...(cleanOptionalString(raw.endDate, 30)
-      ? { endDate: cleanOptionalString(raw.endDate, 30)! }
-      : {}),
-    current: raw.current === true,
+    mode,
+    sectionType,
+    ...(mode === "update" && sourceId ? { sourceId } : {}),
+    label: cleanOptionalString(raw.label, 200) ?? sectionType,
+    data,
   };
+}
+
+function validateProfileChanges(value: unknown): ProfileChangeInput[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value))
+    throw new Error("Profile changes must be a list.");
+  if (value.length > 6)
+    throw new Error("Too many profile changes in one submission.");
+  return value.map(validateProfileChange);
 }
 
 function validateDecisions(
@@ -343,31 +389,17 @@ function validateDecisions(
     seen.add(recommendationId);
     if (item.decision !== "accept" && item.decision !== "reject")
       throw new Error("Choose accept or reject for every recommendation.");
-    if (item.decision === "reject")
-      return { recommendationId, decision: "reject" };
-    const existingProjectSourceId = cleanOptionalString(
-      item.existingProjectSourceId,
-      100,
+    // A rejection keeps the reason the user typed: that is what the coach reads
+    // on its next round. Anything they want added to their profile arrives
+    // separately, as a confirmed profile addition.
+    const specification = cleanOptionalString(
+      item.specification,
+      MAX_SPECIFICATION_LENGTH,
     );
-    const hasNewProject =
-      item.newProject !== undefined && item.newProject !== null;
-    if (existingProjectSourceId && hasNewProject)
-      throw new Error("Choose an existing project or add a new one, not both.");
     return {
       recommendationId,
-      decision: "accept",
-      ...(cleanOptionalString(item.specification, MAX_SPECIFICATION_LENGTH)
-        ? {
-            specification: cleanOptionalString(
-              item.specification,
-              MAX_SPECIFICATION_LENGTH,
-            )!,
-          }
-        : {}),
-      ...(existingProjectSourceId ? { existingProjectSourceId } : {}),
-      ...(hasNewProject
-        ? { newProject: validateNewProject(item.newProject) }
-        : {}),
+      decision: item.decision,
+      ...(specification ? { specification } : {}),
     };
   });
   if (seen.size !== allowed.size)
@@ -375,24 +407,30 @@ function validateDecisions(
   return decisions;
 }
 
-async function validateExistingProject(
+async function applyProfileChange(
   userId: string,
-  sourceId: string,
+  sourceBuildKey: string,
+  change: ProfileChangeInput,
 ): Promise<void> {
-  const project = await prisma.profileInstance.findFirst({
-    where: { id: sourceId, section: { type: "PROJECTS", profile: { userId } } },
-    select: { id: true },
-  });
-  if (!project) throw new Error("The selected project is not in your profile.");
-}
+  if (change.mode === "update") {
+    // validateProfileChange guarantees this; narrowing it keeps the query typed.
+    if (!change.sourceId)
+      throw new Error("An edited profile entry must say which entry it is.");
+    // Ownership is checked through the section's profile: a sourceId from
+    // somebody else's profile must not be writable from here.
+    const target = await prisma.profileInstance.findFirst({
+      where: { id: change.sourceId, section: { profile: { userId } } },
+      select: { id: true },
+    });
+    if (!target) throw new Error("That profile entry is not yours to edit.");
+    await prisma.profileInstance.update({
+      where: { id: target.id },
+      data: { data: change.data as unknown as Prisma.InputJsonObject },
+    });
+    return;
+  }
 
-async function persistNewProject(
-  userId: string,
-  buildId: string,
-  decision: RecommendationDecision,
-): Promise<void> {
-  if (!decision.newProject) return;
-  const sourceBuildKey = `${buildId}:${decision.recommendationId}`;
+  // sourceBuildKey is unique, so a retried submission cannot duplicate an entry.
   const existing = await prisma.profileInstance.findUnique({
     where: { sourceBuildKey },
     select: { id: true },
@@ -403,9 +441,11 @@ async function persistNewProject(
     where: { userId },
     select: { id: true },
   });
-  if (!profile) throw new Error("Save your profile before adding a project.");
+  if (!profile) throw new Error("Save your profile before adding to it.");
+
+  const type = change.sectionType as ProfileSectionType;
   let section = await prisma.profileSection.findFirst({
-    where: { profileId: profile.id, type: "PROJECTS" },
+    where: { profileId: profile.id, type: type as never },
     orderBy: { order: "asc" },
   });
   if (!section) {
@@ -416,13 +456,14 @@ async function persistNewProject(
     section = await prisma.profileSection.create({
       data: {
         profileId: profile.id,
-        type: "PROJECTS",
-        label: "Projects",
+        type: type as never,
+        label: SECTION_LABELS[type],
         order: last ? last.order + 1 : 0,
       },
     });
   }
-  const lastProject = await prisma.profileInstance.findFirst({
+
+  const lastInstance = await prisma.profileInstance.findFirst({
     where: { sectionId: section.id },
     orderBy: { order: "desc" },
   });
@@ -430,11 +471,65 @@ async function persistNewProject(
     data: {
       sourceBuildKey,
       sectionId: section.id,
-      order: lastProject ? lastProject.order + 1 : 0,
-      data: decision.newProject as unknown as Prisma.InputJsonObject,
+      order: lastInstance ? lastInstance.order + 1 : 0,
+      data: change.data as unknown as Prisma.InputJsonObject,
     },
   });
 }
+
+// The profile agent reads what the user typed while reviewing and notices when
+// they have described something their profile does not list. It only proposes;
+// the user confirms each one in the profile's own form before anything is
+// written, which keeps every profile entry something they verified.
+router.post(
+  "/:userId/resumes/:buildId/profile-proposals",
+  async (req: Request, res: Response) => {
+    const user = authenticatedOwner(req, res);
+    if (!user) return;
+    const buildId = req.params.buildId as string;
+    const metadata = await getBuildMetadata(buildId);
+    if (!metadata || metadata.userId !== user.id)
+      return res.status(404).json({ error: "Build not found or expired." });
+
+    const rawNotes = Array.isArray(req.body?.notes) ? req.body.notes : [];
+    const notes = rawNotes
+      .slice(0, 8)
+      .map((entry: unknown) => {
+        const item = (entry ?? {}) as Record<string, unknown>;
+        return {
+          about: cleanOptionalString(item.about, 300) ?? "their resume",
+          text: cleanOptionalString(item.text, MAX_SPECIFICATION_LENGTH) ?? "",
+        };
+      })
+      .filter((note: { text: string }) => note.text);
+    if (!notes.length) return res.json({ changes: [] });
+
+    try {
+      const profile = await getExportedProfile(user);
+      const changes = await proposeProfileChanges({ notes, profile });
+      // An edit needs the entry's data as it stands, so the form can open on
+      // what is there today rather than on the fragment the agent extracted.
+      const withCurrent = await Promise.all(
+        changes.map(async (change) => {
+          if (change.mode !== "update" || !change.sourceId) return change;
+          const target = await prisma.profileInstance.findFirst({
+            where: {
+              id: change.sourceId,
+              section: { profile: { userId: user.id } },
+            },
+            select: { data: true },
+          });
+          return { ...change, current: (target?.data ?? {}) as Record<string, unknown> };
+        }),
+      );
+      return res.json({ changes: withCurrent });
+    } catch (error) {
+      // A failed suggestion must never block the submission it precedes.
+      console.error(`[profile-agent ${buildId}]`, error);
+      return res.json({ changes: [] });
+    }
+  },
+);
 
 router.post(
   "/:userId/resumes/:buildId/decisions",
@@ -473,43 +568,68 @@ router.post(
         req.body?.decisions,
         review.recommendations.map((item) => item.id),
       );
+      if (
+        req.body?.nextStep !== "revise" &&
+        req.body?.nextStep !== "finalize"
+      ) {
+        throw new Error("Choose whether to revise or finalize this version.");
+      }
+      const nextStep = req.body.nextStep as "revise" | "finalize";
+      // Mirrors the disabled Finalize button. Finalizing renders the draft on
+      // screen, so an accepted recommendation that has not been applied yet
+      // would be silently thrown away.
+      if (
+        nextStep === "finalize" &&
+        decisions.some((item) => item.decision === "accept")
+      ) {
+        throw new Error(
+          "Accepted changes have not been applied yet. Choose Revise, or undo those approvals.",
+        );
+      }
+      const note = cleanOptionalString(
+        req.body?.note,
+        MAX_SPECIFICATION_LENGTH,
+      );
+      // A passing draft has no recommendations, so the page offers a project
+      // form of its own; it persists through the same idempotent key path.
+      const profileChanges = validateProfileChanges(req.body?.profileChanges);
 
       for (const decision of decisions) {
         const recommendation = review.recommendations.find(
           (item) => item.id === decision.recommendationId,
         )!;
         if (
-          recommendation.category !== "PROJECT_SELECTION" &&
-          (decision.existingProjectSourceId || decision.newProject)
+          decision.decision === "accept" &&
+          recommendation.requiresUserInput &&
+          !decision.specification
         ) {
           throw new Error(
-            "Project details can only answer a project recommendation.",
+            "This recommendation needs an answer before it can be applied.",
           );
         }
-        if (
-          decision.decision === "accept" &&
-          recommendation.category === "PROJECT_SELECTION" &&
-          recommendation.requiresUserInput &&
-          !decision.existingProjectSourceId &&
-          !decision.newProject
-        ) {
-          throw new Error("Choose an existing project or enter a new project.");
-        }
-        if (decision.existingProjectSourceId)
-          await validateExistingProject(
-            user.id,
-            decision.existingProjectSourceId,
-          );
-        await persistNewProject(user.id, buildId, decision);
       }
+      for (const [index, change] of profileChanges.entries()) {
+        await applyProfileChange(
+          user.id,
+          `${buildId}:${reviewId}:${index}`,
+          change,
+        );
+      }
+      // Read the profile only after every write above, so an entry added in
+      // this same submission is part of what the writer sees.
       const refreshedProfile = await getExportedProfile(user);
       const command: ResumeWorkflowResumeInput = {
         reviewId,
         decisions,
         refreshedProfile,
+        nextStep,
+        ...(note ? { note } : {}),
+        ...(profileChanges.length ? { profileChanges } : {}),
       };
       await putResumeCommand(buildId, command);
-      await patchBuildMetadata(buildId, { status: "revising" });
+      await patchBuildMetadata(buildId, {
+        status: nextStep === "finalize" ? "generating_pdf" : "revising",
+      });
       try {
         await enqueueBuildResume(buildId, reviewId);
       } catch (error) {

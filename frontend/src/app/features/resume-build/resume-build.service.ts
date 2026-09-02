@@ -19,7 +19,6 @@ export interface CoachCriterion {
 
 export interface CoachRecommendation {
   id: string;
-  category: 'PROJECT_SELECTION' | 'CONTENT' | 'SKILLS' | 'STRUCTURE' | 'WORDING';
   title: string;
   rationale: string;
   proposedChange: string;
@@ -41,16 +40,39 @@ export interface CoachReview {
 export interface RecommendationDecision {
   recommendationId: string;
   decision: 'accept' | 'reject';
+  /** Guidance when accepted, the user's reason when rejected. */
   specification?: string;
-  existingProjectSourceId?: string;
-  newProject?: {
-    name: string;
-    description: string;
-    url?: string;
-    startDate?: string;
-    endDate?: string;
-    current?: boolean;
-  };
+}
+
+/**
+ * Something the profile agent noticed in what you wrote: either an entry your
+ * profile does not have, or a fact about one it does have that was never
+ * written down.
+ */
+export interface ProfileProposal {
+  mode: 'create' | 'update';
+  sectionType: string;
+  /** For an update, which existing entry it changes. */
+  sourceId?: string;
+  /** For an update, that entry's data as it stands, to open the form on. */
+  current?: Record<string, unknown>;
+  /** A short phrase naming it, e.g. "a project called Ledger API". */
+  label: string;
+  /** Your own words that prompted it, so you can judge the suggestion. */
+  quote: string;
+  /** For a create, the new entry's fields. For an update, only what changes. */
+  fields: Record<string, string | boolean>;
+  /** Fields you did not mention, which the form should ask you for. */
+  missing: string[];
+}
+
+/** A proposal you confirmed and completed in the profile form. */
+export interface ProfileChangeInput {
+  mode: 'create' | 'update';
+  sectionType: string;
+  sourceId?: string;
+  label: string;
+  data: Record<string, unknown>;
 }
 
 export interface ResumeBuildComplete {
@@ -223,6 +245,23 @@ export class ResumeBuildService {
     );
   }
 
+  /**
+   * Asks the profile agent to read what you typed and notice anything you
+   * described that your profile does not list. It only proposes; nothing is
+   * written until you confirm it in the profile form.
+   */
+  getProfileProposals(
+    userId: string,
+    jobId: string,
+    notes: Array<{ about: string; text: string }>,
+  ): Observable<{ changes: ProfileProposal[] }> {
+    return this.http.post<{ changes: ProfileProposal[] }>(
+      `${this.apiUrl}/users/${userId}/resumes/${jobId}/profile-proposals`,
+      { notes },
+      { withCredentials: true },
+    );
+  }
+
   getReview(userId: string, jobId: string): Observable<{ review: CoachReview }> {
     return this.http.get<{ review: CoachReview }>(
       `${this.apiUrl}/users/${userId}/resumes/${jobId}/review`,
@@ -235,10 +274,12 @@ export class ResumeBuildService {
     jobId: string,
     reviewId: string,
     decisions: RecommendationDecision[],
+    nextStep: 'revise' | 'finalize',
+    extras: { note?: string; profileChanges?: ProfileChangeInput[] } = {},
   ): Observable<{ buildId: string; status: string }> {
     return this.http.post<{ buildId: string; status: string }>(
       `${this.apiUrl}/users/${userId}/resumes/${jobId}/decisions`,
-      { reviewId, decisions },
+      { reviewId, decisions, nextStep, ...extras },
       { withCredentials: true },
     );
   }

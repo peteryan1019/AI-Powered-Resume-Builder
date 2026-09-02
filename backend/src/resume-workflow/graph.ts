@@ -45,6 +45,19 @@ const WorkflowState = Annotation.Root({
   draft: Annotation<Prisma.InputJsonObject>(),
   review: Annotation<ResumeWorkflowState["review"]>(),
   acceptedDecisions: Annotation<RecommendationDecision[]>(),
+  /** Every decision, refusals included, so the writer and the coach see both. */
+  decisions: Annotation<RecommendationDecision[]>(),
+  /** What the user chose to do next, rather than something inferred for them. */
+  nextStep: Annotation<"revise" | "finalize">(),
+  /** A note about the build as a whole, not tied to any recommendation. */
+  note: Annotation<string>(),
+  /**
+   * Profile entries the user added or corrected during this review. They are
+   * already in `profile`, but the writer needs telling that they changed and
+   * were the user's answer to this round -- otherwise rejecting every
+   * recommendation and fixing the profile produces a rewrite that ignores it.
+   */
+  profileChangeLabels: Annotation<string[]>(),
   round: Annotation<number>(),
   resumeId: Annotation<string | null>(),
 });
@@ -141,7 +154,11 @@ async function coachNode(state: State): Promise<Partial<State>> {
 }
 
 function routeAfterCoach(state: State): "publish_review" | "finalize" {
-  return state.review && !state.review.passes && state.round < MAX_COACH_ROUNDS
+  // Publish the review even when the draft passes. A high score means the coach
+  // is satisfied, not that the user is: they may know about a project the
+  // profile never listed, and only they can say the resume is finished. The
+  // round cap remains the one thing that ends the loop on its own.
+  return state.review && state.round < MAX_COACH_ROUNDS
     ? "publish_review"
     : "finalize";
 }
@@ -197,43 +214,83 @@ function humanReviewNode(state: State): Partial<State> {
 
   return {
     profile: response.refreshedProfile,
+    decisions: response.decisions,
     acceptedDecisions: response.decisions.filter(
       (item) => item.decision === "accept",
+    ),
+    nextStep: response.nextStep,
+    ...(response.note ? { note: response.note } : {}),
+    profileChangeLabels: (response.profileChanges ?? []).map((item) =>
+      item.mode === "update" ? `updated ${item.label}` : `added ${item.label}`,
     ),
   };
 }
 
 function routeAfterHuman(state: State): "revise" | "finalize" {
+  // The user decides. Rejecting every recommendation and then adding a project
+  // the profile was missing is still a reason to rewrite the resume, which is
+  // why this no longer infers the answer from the accepted count.
+  if (state.nextStep) return state.nextStep;
+  // Checkpoints written before that choice existed still route the old way.
   return state.acceptedDecisions.length > 0 ? "revise" : "finalize";
 }
 
-function approvedChangesText(state: State): string {
+/**
+ * The block of instructions handed to the writer. It carries refusals as well as
+ * approvals: a recommendation the user turned down has to be stated as a
+ * prohibition, or nothing stops the writer making the same change on its own
+ * initiative and the user sees their objection ignored.
+ */
+function decisionInstructionsText(state: State): string {
   const recommendations = new Map(
     (state.review?.recommendations ?? []).map((item) => [item.id, item]),
   );
-  return state.acceptedDecisions
-    .map((decision) => {
-      const recommendation = recommendations.get(decision.recommendationId);
-      const selectedProject = decision.existingProjectSourceId
-        ? state.profile.sections.find(
-            (section) => section.sourceId === decision.existingProjectSourceId,
-          )
-        : undefined;
-      return [
-        recommendation
-          ? `${recommendation.title}: ${recommendation.proposedChange}`
-          : "Approved change",
-        decision.specification
-          ? `User specification: ${decision.specification}`
-          : "",
-        selectedProject
-          ? `Selected verified profile item (${selectedProject.sourceId}): ${selectedProject.title} — ${selectedProject.description}`
-          : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
-    })
-    .join("\n\n");
+  const describe = (decision: RecommendationDecision): string => {
+    const recommendation = recommendations.get(decision.recommendationId);
+    return [
+      recommendation
+        ? `${recommendation.title}: ${recommendation.proposedChange}`
+        : "Coach recommendation",
+      decision.specification
+        ? `${
+            decision.decision === "accept"
+              ? "User specification"
+              : "The user's reason"
+          }: ${decision.specification}`
+        : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  };
+
+  // Older checkpoints have no `decisions` channel; fall back to the accepted set.
+  const all = state.decisions ?? state.acceptedDecisions ?? [];
+  const accepted = all.filter((item) => item.decision === "accept");
+  const rejected = all.filter((item) => item.decision === "reject");
+  const blocks: string[] = [];
+  if (accepted.length) {
+    blocks.push(
+      `APPROVED — make these changes:\n${accepted.map(describe).join("\n\n")}`,
+    );
+  }
+  if (rejected.length) {
+    blocks.push(
+      `REFUSED — do not make these changes, and do not reintroduce them by another route:\n${rejected
+        .map(describe)
+        .join("\n\n")}`,
+    );
+  }
+  if (state.profileChangeLabels?.length) {
+    blocks.push(
+      `THE USER JUST CHANGED THEIR VERIFIED PROFILE: ${state.profileChangeLabels.join(
+        "; ",
+      )}\nThese were their answer to this review, so use them where they are relevant to the posting. A claim the coach doubted may now be supported by the profile.`,
+    );
+  }
+  if (state.note) {
+    blocks.push(`ALSO REQUESTED BY THE USER:\n${state.note}`);
+  }
+  return blocks.join("\n\n");
 }
 
 async function reviseNode(state: State): Promise<Partial<State>> {
@@ -249,7 +306,7 @@ async function reviseNode(state: State): Promise<Partial<State>> {
     },
     fill,
     `[resume-build ${state.buildId.slice(0, 8)}]`,
-    approvedChangesText(state),
+    decisionInstructionsText(state),
   );
   await nodeEnded(state.buildId, "revise", state.round, startedAt, {
     accepted: state.acceptedDecisions.length,

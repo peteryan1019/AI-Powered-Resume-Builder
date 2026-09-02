@@ -53,16 +53,8 @@ export interface CoachCriterion {
   explanation: string;
 }
 
-export type RecommendationCategory =
-  | "PROJECT_SELECTION"
-  | "CONTENT"
-  | "SKILLS"
-  | "STRUCTURE"
-  | "WORDING";
-
 export interface CoachRecommendation {
   id: string;
-  category: RecommendationCategory;
   title: string;
   rationale: string;
   proposedChange: string;
@@ -80,27 +72,43 @@ export interface CoachReview {
   recommendations: CoachRecommendation[];
 }
 
-export interface NewProjectInput {
-  name: string;
-  description: string;
-  url?: string;
-  startDate?: string;
-  endDate?: string;
-  current?: boolean;
-}
-
 export interface RecommendationDecision {
   recommendationId: string;
   decision: "accept" | "reject";
+  /** Guidance when accepted, the user's reason when rejected. */
   specification?: string;
-  existingProjectSourceId?: string;
-  newProject?: NewProjectInput;
+}
+
+/**
+ * A profile change the user confirmed while reviewing -- either a new entry or
+ * an edit to one they already had. The profile agent proposes these from what
+ * they typed; the user completes and approves each one in the profile's own
+ * instance form, so `data` arrives already in that form's shape for its section
+ * type, and is the FULL entry either way.
+ */
+export interface ProfileChangeInput {
+  mode: "create" | "update";
+  sectionType: string;
+  /** Which existing entry an update replaces. Absent for a create. */
+  sourceId?: string;
+  label: string;
+  data: Record<string, unknown>;
 }
 
 export interface ResumeWorkflowResumeInput {
   reviewId: string;
   decisions: RecommendationDecision[];
   refreshedProfile: ExportedProfile;
+  /**
+   * What the user chose to do next. The graph obeys this rather than inferring
+   * it: rejecting every recommendation and then adding a project the profile
+   * was missing is still a reason to rewrite the resume.
+   */
+  nextStep: "revise" | "finalize";
+  /** A note about the build as a whole, not tied to any recommendation. */
+  note?: string;
+  /** Profile changes the user confirmed while reviewing. */
+  profileChanges?: ProfileChangeInput[];
 }
 
 export interface ReviewProjection extends CoachReview {

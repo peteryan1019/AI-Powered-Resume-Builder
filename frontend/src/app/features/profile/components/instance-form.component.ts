@@ -267,6 +267,14 @@ import { SectionType } from '../profile.types';
 export class InstanceFormComponent implements OnInit {
   @Input() sectionType!: SectionType;
   @Input() existingData: Record<string, unknown> | null = null;
+  /**
+   * Text to add to the description box on top of whatever the entry already
+   * carries. The resume build flow uses it: when its profile agent notices a
+   * fact the user stated but never wrote down, the sentence is appended here
+   * rather than merged by the caller -- only this component knows how legacy
+   * rows fold into the description, so merging anywhere else would drop content.
+   */
+  @Input() appendToDescription: string | null = null;
 
   @Output() formSubmitted = new EventEmitter<Record<string, unknown>>();
   @Output() formCancelled = new EventEmitter<void>();
@@ -370,7 +378,10 @@ export class InstanceFormComponent implements OnInit {
     }
 
     if (this.usesDescription) {
-      patch['description'] = this.foldLegacyIntoDescription(data);
+      const folded = this.foldLegacyIntoDescription(data);
+      patch['description'] = this.appendToDescription
+        ? [folded, this.appendToDescription].filter(Boolean).join('\n\n')
+        : folded;
     }
 
     this.form.patchValue(patch);

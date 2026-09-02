@@ -72,9 +72,10 @@ following this prompt.`;
 profile alone.`
     : "";
   const role = requestedChanges
-    ? `You are an expert resume writer revising a draft after the user approved
-specific coaching changes. Apply only the approved direction, while performing
-the truth, relevance, and one-page quality checks below.`
+    ? `You are an expert resume writer revising a draft after the user reviewed
+the coach's recommendations. Follow their decisions exactly -- make what they
+approved, leave out what they refused -- while performing the truth, relevance,
+and one-page quality checks below.`
     : `You are a senior hiring manager reviewing a DRAFT resume written for a
 specific job posting. Return a REVISED version that is strictly stronger, fully
 truthful, and better targeted.`;
@@ -101,13 +102,15 @@ ${JSON.stringify(input2.userProfile, null, 2)}
 DRAFT RESUME UNDER REVIEW:
 ${JSON.stringify(input, null, 2)}
 
-USER-APPROVED COACHING CHANGES:
-${requestedChanges || "No specific changes were approved. Perform the normal truth and quality review."}
+USER DECISIONS ON THE COACH'S RECOMMENDATIONS:
+${requestedChanges || "The user made no specific requests. Perform the normal truth and quality review."}
 
-The block above contains only choices the user approved. Apply those choices
-when they remain truthful according to the verified profile. A user's
-specification tells you what to select or emphasize; it never overrides the
-verified profile and never authorizes inventing a fact.
+The block above carries the user's decisions, which may include both changes
+they approved and changes they refused. Apply the approved ones when they remain
+truthful according to the verified profile. A refusal is binding: do not make
+that change, and do not achieve the same effect by another route. A user's
+specification or reason tells you what to select, emphasize, or leave alone; it
+never overrides the verified profile and never authorizes inventing a fact.
 
 ROOT SKELETON:
 ${JSON.stringify(selectedTemplate, null, 2)}

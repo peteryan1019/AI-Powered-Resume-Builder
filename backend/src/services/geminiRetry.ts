@@ -7,6 +7,18 @@ export const FASTEST_GEMINI_TEXT_MODEL = "gemini-3.1-flash-lite";
 // the coach reads COACH_KEY rather than sharing APIKEY_2.
 export const COACH_GEMINI_MODEL = "gemini-3.1-pro-preview";
 
+// The profile agent reads what the user typed and decides whether it names
+// something their profile is missing. Extraction, not judgement, so the fast
+// cheap model is right for it. (It first appeared to need a stronger model,
+// dropping stated facts and writing prose into `url`. That was the response
+// SCHEMA, not the model: asked to fill one object of twenty-odd optional
+// properties, it reached for something to put in each. Asked for a list of
+// key/value pairs, flash-lite is exact -- and three times faster than flash.)
+// Overridable so a bad extraction can be re-run against a stronger model
+// without a deploy.
+export const PROFILE_AGENT_MODEL =
+  process.env.PROFILE_AGENT_MODEL ?? "gemini-3.1-flash-lite";
+
 const MAX_AI_MODEL_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 500;
 const JITTER_MS = 150;

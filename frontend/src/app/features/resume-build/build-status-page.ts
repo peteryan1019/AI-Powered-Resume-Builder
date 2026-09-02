@@ -7,6 +7,8 @@ import { AuthService } from '../auth/auth.service';
 import {
   CoachRecommendation,
   CoachReview,
+  ProfileChangeInput,
+  ProfileProposal,
   RecommendationDecision,
   ResumeBuildService,
   ResumeBuildStep,
@@ -15,6 +17,8 @@ import {
   foldTrace,
 } from './resume-build.service';
 import { RunTraceComponent } from './run-trace.component';
+import { InstanceFormComponent } from '../profile/components/instance-form.component';
+import { SectionType } from '../profile/profile.types';
 
 interface DisplayStep {
   states: ResumeBuildStep['state'][];
@@ -24,33 +28,19 @@ interface DisplayStep {
 
 interface DecisionDraft {
   decision: 'accept' | 'reject' | null;
+  /** Guidance when approving, the reason when rejecting. The profile agent
+   *  reads this too, and may notice something worth adding to the profile. */
   specification: string;
-  projectMode: 'none' | 'existing' | 'new';
-  existingProjectSourceId: string;
-  newProject: {
-    name: string;
-    description: string;
-    url: string;
-    startDate: string;
-    endDate: string;
-    current: boolean;
-  };
 }
 
 function emptyDecision(): DecisionDraft {
-  return {
-    decision: null,
-    specification: '',
-    projectMode: 'none',
-    existingProjectSourceId: '',
-    newProject: { name: '', description: '', url: '', startDate: '', endDate: '', current: false },
-  };
+  return { decision: null, specification: '' };
 }
 
 @Component({
   selector: 'app-build-status-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, RunTraceComponent],
+  imports: [CommonModule, FormsModule, RouterLink, RunTraceComponent, InstanceFormComponent],
   template: `
     <section class="build-page">
       <div class="panel">
@@ -128,77 +118,14 @@ function emptyDecision(): DecisionDraft {
                 </button>
               </div>
 
-              <div class="user-reply" *ngIf="decisionFor(item.id).decision === 'accept'">
+              <div class="user-reply" *ngIf="decisionFor(item.id).decision">
                 <p class="speaker">Your reply</p>
-                <ng-container *ngIf="item.category === 'PROJECT_SELECTION'">
-                  <label class="radio" *ngIf="currentReview.projectCandidates.length">
-                    <input
-                      type="radio"
-                      [name]="'project-mode-' + item.id"
-                      value="existing"
-                      [(ngModel)]="decisionFor(item.id).projectMode"
-                    />
-                    Use a project already in my profile
-                  </label>
-                  <select
-                    *ngIf="decisionFor(item.id).projectMode === 'existing'"
-                    [(ngModel)]="decisionFor(item.id).existingProjectSourceId"
-                  >
-                    <option value="">Choose a project</option>
-                    <option
-                      *ngFor="let project of projectOptions(item, currentReview)"
-                      [value]="project.sourceId"
-                    >
-                      {{ project.title }}
-                    </option>
-                  </select>
-                  <label class="radio">
-                    <input
-                      type="radio"
-                      [name]="'project-mode-' + item.id"
-                      value="new"
-                      [(ngModel)]="decisionFor(item.id).projectMode"
-                    />
-                    Add a new project to my profile
-                  </label>
-                  <div class="project-form" *ngIf="decisionFor(item.id).projectMode === 'new'">
-                    <label
-                      >Project name<input [(ngModel)]="decisionFor(item.id).newProject.name"
-                    /></label>
-                    <label class="wide"
-                      >Project details<textarea
-                        rows="4"
-                        [(ngModel)]="decisionFor(item.id).newProject.description"
-                        placeholder="What it does, your contribution, technologies, and verified results"
-                      ></textarea>
-                    </label>
-                    <label class="wide"
-                      >Project URL (optional)<input
-                        type="url"
-                        [(ngModel)]="decisionFor(item.id).newProject.url"
-                    /></label>
-                    <label
-                      >Start date<input
-                        placeholder="YYYY-MM"
-                        [(ngModel)]="decisionFor(item.id).newProject.startDate"
-                    /></label>
-                    <label
-                      >End date<input
-                        placeholder="YYYY-MM"
-                        [disabled]="decisionFor(item.id).newProject.current"
-                        [(ngModel)]="decisionFor(item.id).newProject.endDate"
-                    /></label>
-                    <label class="radio wide"
-                      ><input
-                        type="checkbox"
-                        [(ngModel)]="decisionFor(item.id).newProject.current"
-                      />
-                      Ongoing project</label
-                    >
-                  </div>
-                </ng-container>
                 <label class="specification">
-                  Anything the writer should know? (optional)
+                  {{
+                    decisionFor(item.id).decision === 'reject'
+                      ? 'Why not? The coach reads this before its next review. (optional)'
+                      : 'Anything the writer should know? (optional)'
+                  }}
                   <textarea
                     rows="3"
                     maxlength="2000"
@@ -208,15 +135,92 @@ function emptyDecision(): DecisionDraft {
               </div>
             </div>
 
+            <div class="page-reply">
+              <p class="speaker">Anything else</p>
+              <label class="specification">
+                Anything else you want changed? (optional)
+                <textarea rows="3" maxlength="2000" [(ngModel)]="pageDraft.specification"></textarea>
+              </label>
+            </div>
+
             <p class="inline-error" *ngIf="feedbackError()">{{ feedbackError() }}</p>
-            <button
-              class="submit"
-              type="button"
-              [disabled]="!canSubmitFeedback(currentReview) || submitting()"
-              (click)="submitFeedback(currentReview)"
+
+            <p class="checking" *ngIf="checkingProfile()">
+              Reading your notes against your profile…
+            </p>
+
+            <div class="proposal" *ngIf="currentProposal() as proposal">
+              <p class="speaker">
+                Before we continue
+                <span *ngIf="proposals().length > 1"
+                  >· {{ proposalIndex() + 1 }} of {{ proposals().length }}</span
+                >
+              </p>
+              <p *ngIf="proposal.mode === 'create'">
+                It looks like you mentioned {{ proposal.label }}, which isn't in your profile
+                yet. Would you like to add it?
+              </p>
+              <p *ngIf="proposal.mode === 'update'">
+                It looks like you said something about {{ proposal.label }} that isn't written
+                into your profile yet. Would you like to add it there?
+              </p>
+              <blockquote>{{ proposal.quote }}</blockquote>
+              <p class="hint left" *ngIf="proposal.missing.length && !openForm()">
+                You didn't mention {{ describeMissing(proposal.missing) }} — the form will ask.
+              </p>
+              <div class="choice-row" *ngIf="!openForm()">
+                <button type="button" (click)="acceptProposal()">
+                  {{ proposal.mode === 'update' ? 'Yes, update my profile' : 'Yes, add it to my profile' }}
+                </button>
+                <button type="button" (click)="declineProposal(currentReview)">
+                  No, skip this
+                </button>
+              </div>
+              <app-instance-form
+                *ngIf="openForm()"
+                [sectionType]="currentSectionType()"
+                [existingData]="formData()"
+                [appendToDescription]="formAppend()"
+                (formSubmitted)="proposalCompleted(currentReview, $event)"
+                (formCancelled)="declineProposal(currentReview)"
+              />
+            </div>
+
+            <div
+              class="choice-row submit-row"
+              *ngIf="!currentProposal() && !checkingProfile()"
             >
-              {{ submitting() ? 'Sending to the writer…' : 'Continue with my decisions' }}
-            </button>
+              <button
+                class="submit"
+                type="button"
+                [disabled]="!canSubmitFeedback(currentReview) || submitting() || atRoundCap()"
+                (click)="submitFeedback(currentReview, 'revise')"
+              >
+                {{ submitting() ? 'Sending…' : 'Revise with my input' }}
+              </button>
+              <button
+                class="submit secondary"
+                type="button"
+                [disabled]="
+                  !canSubmitFeedback(currentReview) ||
+                  submitting() ||
+                  hasPendingAccepts(currentReview)
+                "
+                (click)="submitFeedback(currentReview, 'finalize')"
+              >
+                Finalize this version
+              </button>
+            </div>
+            <ng-container *ngIf="!currentProposal() && !checkingProfile()">
+            <p class="hint" *ngIf="blockingReason(currentReview) as reason">{{ reason }}</p>
+            <p class="hint" *ngIf="hasPendingAccepts(currentReview)">
+              You approved a change that has not been applied yet, so finalizing now would drop it.
+              Choose Revise, or set those back to Reject.
+            </p>
+            <p class="hint" *ngIf="atRoundCap()">
+              This is the last coaching round, so this version is the one you finalize.
+            </p>
+            </ng-container>
           </section>
         </ng-template>
 
@@ -404,6 +408,50 @@ function emptyDecision(): DecisionDraft {
         border-radius: 0.8rem;
         background: rgba(255, 255, 255, 0.05);
       }
+      .page-reply {
+        margin-top: 1.75rem;
+        padding: 1.15rem;
+        border-radius: 0.8rem;
+        border: 1px dashed rgba(255, 255, 255, 0.16);
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .submit-row {
+        justify-content: center;
+        gap: 0.75rem;
+        margin-top: 1.25rem;
+      }
+      .submit-row .submit {
+        margin: 0;
+      }
+      .submit.secondary {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+      }
+      .hint {
+        margin: 0.7rem 0 0;
+        text-align: center;
+        font-size: 0.78rem;
+        color: rgba(244, 246, 255, 0.5);
+      }
+      .hint.left {
+        text-align: left;
+      }
+      .checking {
+        margin: 1.5rem 0 0;
+        text-align: center;
+        font-size: 0.85rem;
+        color: rgba(244, 246, 255, 0.55);
+      }
+      .proposal {
+        margin-top: 1.75rem;
+        padding: 1.25rem;
+        border-radius: 0.9rem;
+        border: 1px solid rgba(139, 114, 255, 0.45);
+        background: rgba(122, 97, 255, 0.09);
+      }
+      .proposal .choice-row {
+        margin-top: 1rem;
+      }
       label {
         display: grid;
         gap: 0.35rem;
@@ -548,6 +596,49 @@ export class BuildStatusPage implements OnInit, OnDestroy {
   private eventCursor = '';
   private leaving = false;
   private decisions = new Map<string, DecisionDraft>();
+  /**
+   * The review page's own note and project, not attached to any recommendation.
+   * A passing draft comes back with zero recommendations, so without these the
+   * page would offer nowhere at all to say what should change.
+   */
+  readonly pageDraft: DecisionDraft = emptyDecision();
+
+  /** What the profile agent noticed, walked through one at a time. */
+  readonly proposals = signal<ProfileProposal[]>([]);
+  readonly proposalIndex = signal(0);
+  readonly openForm = signal(false);
+  readonly checkingProfile = signal(false);
+  readonly confirmedChanges = signal<ProfileChangeInput[]>([]);
+  private readonly pendingNextStep = signal<'revise' | 'finalize' | null>(null);
+
+  readonly currentProposal = computed(
+    () => this.proposals()[this.proposalIndex()] ?? null,
+  );
+
+  /**
+   * What the profile form opens on. For an edit that is the entry's data exactly
+   * as stored -- raw, so the form's own legacy-field folding runs and nothing
+   * already written is lost. Non-description corrections are layered on top.
+   */
+  readonly formData = computed<Record<string, unknown> | null>(() => {
+    const proposal = this.currentProposal();
+    if (!proposal) return null;
+    if (proposal.mode === 'create') return proposal.fields;
+    const { description: _ignored, ...corrections } = proposal.fields;
+    return { ...(proposal.current ?? {}), ...corrections };
+  });
+
+  /** The sentence the agent extracted, appended by the form after folding. */
+  readonly formAppend = computed<string | null>(() => {
+    const proposal = this.currentProposal();
+    if (!proposal || proposal.mode !== 'update') return null;
+    const text = proposal.fields['description'];
+    return typeof text === 'string' && text.trim() ? text.trim() : null;
+  });
+  /** The profile form is typed against its own SectionType union. */
+  readonly currentSectionType = computed(
+    () => (this.currentProposal()?.sectionType ?? 'PROJECTS') as SectionType,
+  );
 
   ngOnInit(): void {
     this.jobId = this.route.snapshot.paramMap.get('jobId');
@@ -586,64 +677,198 @@ export class BuildStatusPage implements OnInit, OnDestroy {
     this.feedbackError.set(null);
   }
 
-  projectOptions(item: CoachRecommendation, review: CoachReview) {
-    const preferred = new Set(item.candidateSourceIds);
-    return [...review.projectCandidates].sort(
-      (a, b) => Number(preferred.has(b.sourceId)) - Number(preferred.has(a.sourceId)),
+
+  /**
+   * True on the final coaching round, when revising again is no longer offered.
+   * The limit comes from the coach's own node_end report rather than a constant
+   * duplicated here, so it cannot drift from MAX_COACH_ROUNDS on the server.
+   */
+  readonly atRoundCap = computed(() => {
+    const review = this.review();
+    if (!review) return false;
+    const coachVisits = this.trace().filter((visit) => visit.node === 'coach');
+    const maxRounds = coachVisits[coachVisits.length - 1]?.detail?.maxRounds;
+    return maxRounds !== undefined && review.round >= maxRounds;
+  });
+
+  /** Finalizing renders the draft on screen, so a pending approval would be lost. */
+  hasPendingAccepts(review: CoachReview): boolean {
+    return review.recommendations.some(
+      (item) => this.decisionFor(item.id).decision === 'accept',
     );
+  }
+
+  /**
+   * Why both buttons are disabled, in the user's terms. Without this a required
+   * answer several cards up leaves the page looking broken rather than blocked.
+   */
+  blockingReason(review: CoachReview): string | null {
+    if (this.canSubmitFeedback(review)) return null;
+    if (review.recommendations.some((item) => !this.decisionFor(item.id).decision)) {
+      return 'Approve or reject every suggestion to continue.';
+    }
+    const needsAnswer = review.recommendations.filter((item) => {
+      const draft = this.decisionFor(item.id);
+      return (
+        draft.decision === 'accept' &&
+        item.requiresUserInput &&
+        !draft.specification.trim()
+      );
+    });
+    if (needsAnswer.length) {
+      return `"${needsAnswer[0]!.title}" needs an answer before it can be applied.`;
+    }
+    return null;
   }
 
   canSubmitFeedback(review: CoachReview): boolean {
     return review.recommendations.every((item) => {
       const draft = this.decisionFor(item.id);
       if (!draft.decision) return false;
-      if (draft.decision === 'reject' || item.category !== 'PROJECT_SELECTION') return true;
-      if (draft.projectMode === 'existing') return Boolean(draft.existingProjectSourceId);
-      if (draft.projectMode === 'new')
-        return Boolean(draft.newProject.name.trim() && draft.newProject.description.trim());
-      return !item.requiresUserInput;
+      if (draft.decision === 'reject' || !item.requiresUserInput) return true;
+      // Only the user can answer this one, and words are the answer.
+      return Boolean(draft.specification.trim());
     });
   }
 
-  submitFeedback(review: CoachReview): void {
+  /**
+   * Step one of submitting. Before anything is sent, the profile agent reads
+   * what the user typed and says whether they described something their profile
+   * does not list. If it finds nothing -- the common case -- this goes straight
+   * through and they never know it ran.
+   */
+  submitFeedback(review: CoachReview, nextStep: 'revise' | 'finalize'): void {
     if (!this.userId || !this.jobId || !this.canSubmitFeedback(review)) return;
+    this.feedbackError.set(null);
+    this.pendingNextStep.set(nextStep);
+
+    const notes = [
+      ...review.recommendations.map((item) => ({
+        about: item.title,
+        text: this.decisionFor(item.id).specification.trim(),
+      })),
+      { about: 'the resume as a whole', text: this.pageDraft.specification.trim() },
+    ].filter((note) => note.text);
+
+    if (!notes.length) {
+      this.sendDecisions(review);
+      return;
+    }
+
+    this.checkingProfile.set(true);
+    this.resumeBuild.getProfileProposals(this.userId, this.jobId, notes).subscribe({
+      next: ({ changes }) => {
+        this.checkingProfile.set(false);
+        if (!changes.length) {
+          this.sendDecisions(review);
+          return;
+        }
+        this.proposals.set(changes);
+        this.proposalIndex.set(0);
+        this.openForm.set(false);
+      },
+      // A suggestion that fails must never block the submission it precedes.
+      error: () => {
+        this.checkingProfile.set(false);
+        this.sendDecisions(review);
+      },
+    });
+  }
+
+  /** Field names are for the code; this is what the user reads. */
+  private readonly FIELD_LABELS: Record<string, string> = {
+    startDate: 'a start date',
+    endDate: 'an end date',
+    date: 'a date',
+    url: 'a link',
+    issuer: 'who issued it',
+    company: 'the employer',
+    school: 'the school',
+    organization: 'the organisation',
+    role: 'your role',
+    description: 'what it involved',
+    current: 'whether it is ongoing',
+    gpa: 'a GPA',
+    proficiency: 'your level',
+  };
+
+  describeMissing(missing: string[]): string {
+    const words = missing.map((key) => this.FIELD_LABELS[key] ?? key);
+    if (words.length === 1) return words[0]!;
+    return `${words.slice(0, -1).join(', ')} or ${words[words.length - 1]}`;
+  }
+
+  /** "Yes, add it" -- open the profile's own form, pre-filled with what it read. */
+  acceptProposal(): void {
+    this.openForm.set(true);
+  }
+
+  /** "No, skip" -- move on without adding anything. */
+  declineProposal(review: CoachReview): void {
+    this.advanceProposal(review);
+  }
+
+  /** The profile form emits the finished entry; keep it and move on. */
+  proposalCompleted(review: CoachReview, data: Record<string, unknown>): void {
+    const proposal = this.currentProposal();
+    if (proposal) {
+      this.confirmedChanges.update((list) => [
+        ...list,
+        {
+          mode: proposal.mode,
+          sectionType: proposal.sectionType,
+          ...(proposal.mode === 'update' && proposal.sourceId
+            ? { sourceId: proposal.sourceId }
+            : {}),
+          label: proposal.label,
+          data,
+        },
+      ]);
+    }
+    this.advanceProposal(review);
+  }
+
+  private advanceProposal(review: CoachReview): void {
+    this.openForm.set(false);
+    const next = this.proposalIndex() + 1;
+    if (next < this.proposals().length) {
+      this.proposalIndex.set(next);
+      return;
+    }
+    this.proposals.set([]);
+    this.sendDecisions(review);
+  }
+
+  /** Step two: the decisions, the note, and anything the user confirmed adding. */
+  private sendDecisions(review: CoachReview): void {
+    const nextStep = this.pendingNextStep();
+    if (!this.userId || !this.jobId || !nextStep) return;
     const decisions: RecommendationDecision[] = review.recommendations.map((item) => {
       const draft = this.decisionFor(item.id);
-      if (draft.decision === 'reject') return { recommendationId: item.id, decision: 'reject' };
-      const base: RecommendationDecision = {
+      // A rejection carries the reason the user typed; the coach reads it next round.
+      return {
         recommendationId: item.id,
-        decision: 'accept',
+        decision: draft.decision as 'accept' | 'reject',
         ...(draft.specification.trim() ? { specification: draft.specification.trim() } : {}),
       };
-      if (item.category === 'PROJECT_SELECTION' && draft.projectMode === 'existing') {
-        base.existingProjectSourceId = draft.existingProjectSourceId;
-      }
-      if (item.category === 'PROJECT_SELECTION' && draft.projectMode === 'new') {
-        base.newProject = {
-          name: draft.newProject.name.trim(),
-          description: draft.newProject.description.trim(),
-          ...(draft.newProject.url.trim() ? { url: draft.newProject.url.trim() } : {}),
-          ...(draft.newProject.startDate.trim()
-            ? { startDate: draft.newProject.startDate.trim() }
-            : {}),
-          ...(draft.newProject.endDate.trim() && !draft.newProject.current
-            ? { endDate: draft.newProject.endDate.trim() }
-            : {}),
-          current: draft.newProject.current,
-        };
-      }
-      return base;
     });
+    const changes = this.confirmedChanges();
 
     this.submitting.set(true);
-    this.feedbackError.set(null);
     this.resumeBuild
-      .submitDecisions(this.userId, this.jobId, review.reviewId, decisions)
+      .submitDecisions(this.userId, this.jobId, review.reviewId, decisions, nextStep, {
+        ...(this.pageDraft.specification.trim()
+          ? { note: this.pageDraft.specification.trim() }
+          : {}),
+        ...(changes.length ? { profileChanges: changes } : {}),
+      })
       .subscribe({
         next: () => {
           this.submitting.set(false);
+          this.confirmedChanges.set([]);
+          this.pendingNextStep.set(null);
           this.review.set(null);
-          this.activeIndex.set(2);
+          this.activeIndex.set(nextStep === 'finalize' ? 3 : 2);
           this.started.set(false);
           this.openEventStream();
         },
