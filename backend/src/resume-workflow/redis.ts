@@ -125,6 +125,53 @@ export async function createBuildRecord(input: BuildInput): Promise<void> {
 }
 
 /**
+ * Everything one build owns in Redis, so deleting a session leaves nothing
+ * behind. Beyond the five `resume:build:*` keys, LangGraph's checkpointer keeps
+ * roughly fifty more per build across four key families -- the graph state that
+ * lets a paused build resume. All of them are addressed `<prefix>:<buildId>::…`,
+ * which is what makes them findable.
+ *
+ * This deliberately does NOT touch the Resume row a finished build produced.
+ * Discarding a build is not the same as throwing away the resume it wrote, and
+ * that resume is reachable from My resumes independently of any of this.
+ */
+export async function deleteBuild(
+  userId: string,
+  buildId: string,
+): Promise<number> {
+  let removed = 0;
+  for (const prefix of [
+    "checkpoint",
+    "checkpoint_blob",
+    "checkpoint_write",
+    "write_keys_zset",
+  ]) {
+    let cursor = "0";
+    do {
+      const [next, keys] = await redis.scan(
+        cursor,
+        "MATCH",
+        `${prefix}:${buildId}::*`,
+        "COUNT",
+        200,
+      );
+      cursor = next;
+      if (keys.length) removed += await redis.del(...keys);
+    } while (cursor !== "0");
+  }
+
+  removed += await redis.del(
+    buildMetaKey(buildId),
+    buildInputKey(buildId),
+    buildReviewKey(buildId),
+    buildResumeCommandKey(buildId),
+    buildEventsKey(buildId),
+  );
+  await redis.zrem(userBuildsKey(userId), buildId);
+  return removed;
+}
+
+/**
  * Adds builds that predate the index, once per user.
  *
  * The index is written when a build is created, so builds that already existed

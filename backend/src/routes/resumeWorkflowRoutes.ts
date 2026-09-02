@@ -17,6 +17,7 @@ import {
 import {
   enqueueBuildResume,
   enqueueBuildStart,
+  removeQueuedBuild,
 } from "../resume-workflow/queue.js";
 import {
   buildEventsKey,
@@ -25,6 +26,7 @@ import {
   getBuildInput,
   getBuildMetadata,
   getRedis,
+  deleteBuild,
   getReviewProjection,
   listUserBuilds,
   readBuildEvents,
@@ -229,6 +231,25 @@ router.get(
         b.createdAt.localeCompare(a.createdAt),
     );
     return res.json({ sessions });
+  },
+);
+
+// Deleting a session discards the build: its state, its coaching history, and
+// its LangGraph checkpoints. It deliberately leaves the resume a finished build
+// produced, which lives in Postgres and is reachable from My resumes.
+router.delete(
+  "/:userId/resumes/:buildId/session",
+  async (req: Request, res: Response) => {
+    const user = authenticatedOwner(req, res);
+    if (!user) return;
+    const buildId = req.params.buildId as string;
+    const metadata = await getBuildMetadata(buildId);
+    if (!metadata || metadata.userId !== user.id)
+      return res.status(404).json({ error: "Build not found or already gone." });
+
+    await removeQueuedBuild(buildId);
+    const keysRemoved = await deleteBuild(user.id, buildId);
+    return res.json({ deleted: true, keysRemoved });
   },
 );
 

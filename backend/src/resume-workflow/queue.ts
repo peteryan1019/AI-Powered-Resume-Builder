@@ -44,6 +44,21 @@ export function enqueueBuildResume(
   );
 }
 
+/**
+ * Drops a build's queued start job, so deleting a session does not leave a job
+ * that will wake up to find its build gone. A job already being worked cannot
+ * be removed; the worker handles that itself, failing with UnrecoverableError
+ * when the build's input has disappeared.
+ */
+export async function removeQueuedBuild(buildId: string): Promise<void> {
+  try {
+    const job = await queue.getJob(`start-${buildId}`);
+    await job?.remove();
+  } catch {
+    // Already gone, or already running. Neither is a problem here.
+  }
+}
+
 export function closeResumeQueue(): Promise<void> {
   return queue.close();
 }

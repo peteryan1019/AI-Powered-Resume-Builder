@@ -256,6 +256,18 @@ export class ResumeBuildService {
     );
   }
 
+  /**
+   * Discards a build: its state, coaching history and graph checkpoints. The
+   * resume a finished build produced is kept -- that lives in My resumes and is
+   * not part of the session.
+   */
+  deleteSession(userId: string, buildId: string): Observable<{ deleted: boolean }> {
+    return this.http.delete<{ deleted: boolean }>(
+      `${this.apiUrl}/users/${userId}/resumes/${buildId}/session`,
+      { withCredentials: true },
+    );
+  }
+
   /** The workflow's node/edge topology, for drawing the diagram. */
   getWorkflowGraph(userId: string): Observable<WorkflowTopology> {
     return this.http.get<WorkflowTopology>(

@@ -114,6 +114,99 @@ describe('SessionsPage', () => {
     expect(el.textContent).toContain('View resume');
   });
 
+  it('asks before deleting, and says what survives', async () => {
+    mount({ id: USER });
+    await fixture.whenStable();
+    http.expectOne(`/api/users/${USER}/resumes/sessions`).flush({
+      sessions: [
+        session({ buildId: 'paused', status: 'awaiting_feedback', round: 1, score: 88 }),
+        session({ buildId: 'finished', status: 'done', resumeId: 'r1', title: 'Dev' }),
+      ],
+    });
+    await fixture.whenStable();
+    const el: HTMLElement = fixture.nativeElement;
+
+    // Nothing is asked for until the user asks for it.
+    expect(el.querySelector('.confirm')).toBeNull();
+    el.querySelectorAll<HTMLButtonElement>('.delete')[1]!.click();
+    await fixture.whenStable();
+
+    // A finished build's resume is not part of the session, and the copy says so.
+    expect(el.querySelector('.confirm')!.textContent).toContain(
+      'The resume it produced stays in My resumes',
+    );
+    // Only the row being confirmed shows it.
+    expect(el.querySelectorAll('.confirm').length).toBe(1);
+    // And no request has gone out yet.
+    http.expectNone(`/api/users/${USER}/resumes/finished/session`);
+  });
+
+  it('warns that coaching history is lost for a build still in progress', async () => {
+    mount({ id: USER });
+    await fixture.whenStable();
+    http.expectOne(`/api/users/${USER}/resumes/sessions`).flush({
+      sessions: [session({ buildId: 'paused', status: 'awaiting_feedback', round: 2, score: 71 })],
+    });
+    await fixture.whenStable();
+    const el: HTMLElement = fixture.nativeElement;
+    el.querySelector<HTMLButtonElement>('.delete')!.click();
+    await fixture.whenStable();
+    expect(el.querySelector('.confirm')!.textContent).toContain('cannot be undone');
+  });
+
+  it('deletes only on confirmation, and drops the row', async () => {
+    mount({ id: USER });
+    await fixture.whenStable();
+    http.expectOne(`/api/users/${USER}/resumes/sessions`).flush({
+      sessions: [
+        session({ buildId: 'keep-me', status: 'done', resumeId: 'r1', title: 'Kept' }),
+        session({ buildId: 'bin-me', status: 'error', errorMessage: 'broke' }),
+      ],
+    });
+
+    component.askDelete('bin-me');
+    component.confirmDelete('bin-me');
+    const req = http.expectOne(`/api/users/${USER}/resumes/bin-me/session`);
+    expect(req.request.method).toBe('DELETE');
+    req.flush({ deleted: true });
+
+    expect(component.sessions().map((s) => s.buildId)).toEqual(['keep-me']);
+    expect(component.confirming()).toBeNull();
+    expect(component.deleting()).toBeNull();
+  });
+
+  it('sends nothing when the user backs out', async () => {
+    mount({ id: USER });
+    await fixture.whenStable();
+    http.expectOne(`/api/users/${USER}/resumes/sessions`).flush({
+      sessions: [session({ buildId: 'b1' })],
+    });
+
+    component.askDelete('b1');
+    component.cancelDelete();
+    expect(component.confirming()).toBeNull();
+    // http.verify() in afterEach fails if a DELETE went out.
+    expect(component.sessions().length).toBe(1);
+  });
+
+  it('keeps the row and explains when the delete fails', async () => {
+    mount({ id: USER });
+    await fixture.whenStable();
+    http.expectOne(`/api/users/${USER}/resumes/sessions`).flush({
+      sessions: [session({ buildId: 'b1' })],
+    });
+
+    component.askDelete('b1');
+    component.confirmDelete('b1');
+    http
+      .expectOne(`/api/users/${USER}/resumes/b1/session`)
+      .flush('nope', { status: 500, statusText: 'error' });
+
+    expect(component.sessions().length).toBe(1);
+    expect(component.errorMessage()).toBe('Unable to delete that session right now.');
+    expect(component.deleting()).toBeNull();
+  });
+
   it('asks the user to log in rather than calling the API', async () => {
     mount(null);
     await fixture.whenStable();

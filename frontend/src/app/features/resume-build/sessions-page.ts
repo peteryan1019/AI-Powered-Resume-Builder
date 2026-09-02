@@ -75,6 +75,36 @@ interface SessionCard {
             >
               View resume
             </a>
+            <button
+              class="delete"
+              type="button"
+              *ngIf="confirming() !== card.session.buildId"
+              (click)="askDelete(card.session.buildId)"
+              [attr.aria-label]="'Delete the session for ' + (card.session.title ?? card.session.jobPost)"
+            >
+              Delete
+            </button>
+          </div>
+
+          <div class="confirm" *ngIf="confirming() === card.session.buildId">
+            <p>
+              {{
+                card.session.status === 'done'
+                  ? 'Delete this session? The resume it produced stays in My resumes.'
+                  : 'Delete this session? Its coaching history goes with it, and that cannot be undone.'
+              }}
+            </p>
+            <div class="confirm-actions">
+              <button
+                type="button"
+                class="danger"
+                [disabled]="deleting() === card.session.buildId"
+                (click)="confirmDelete(card.session.buildId)"
+              >
+                {{ deleting() === card.session.buildId ? 'Deleting…' : 'Yes, delete it' }}
+              </button>
+              <button type="button" class="keep" (click)="cancelDelete()">Keep it</button>
+            </div>
           </div>
         </li>
       </ul>
@@ -213,6 +243,58 @@ interface SessionCard {
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.22);
       }
+      .delete {
+        flex-shrink: 0;
+        padding: 0.5rem 0.9rem;
+        border-radius: 0.6rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: rgba(244, 246, 255, 0.6);
+        background: none;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+      }
+      .delete:hover {
+        color: #ffd9de;
+        border-color: rgba(255, 96, 116, 0.5);
+      }
+      .confirm {
+        margin: 0.5rem 0 0;
+        padding: 0.85rem 1.15rem;
+        border-radius: 0.7rem;
+        border: 1px solid rgba(255, 96, 116, 0.45);
+        background: rgba(255, 96, 116, 0.1);
+      }
+      .confirm p {
+        margin: 0 0 0.7rem;
+        font-size: 0.85rem;
+      }
+      .confirm-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+      }
+      .confirm-actions button {
+        padding: 0.5rem 1rem;
+        border-radius: 0.6rem;
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .confirm-actions .danger {
+        color: #fff;
+        background: #c2344a;
+        border: 1px solid #d94a60;
+      }
+      .confirm-actions .danger:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      .confirm-actions .keep {
+        color: var(--ink);
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.22);
+      }
       .footnote {
         margin-top: 1.5rem;
       }
@@ -231,6 +313,9 @@ export class SessionsPage implements OnInit {
   readonly sessions = signal<BuildSession[]>([]);
   readonly loading = signal(true);
   readonly errorMessage = signal<string | null>(null);
+  /** Which row is asking to be confirmed, and which is mid-delete. */
+  readonly confirming = signal<string | null>(null);
+  readonly deleting = signal<string | null>(null);
 
   readonly waitingCount = computed(
     () => this.sessions().filter((s) => s.status === 'awaiting_feedback').length,
@@ -279,6 +364,35 @@ export class SessionsPage implements OnInit {
     revising: 'Applying your feedback',
     generating_pdf: 'Generating the PDF',
   };
+
+  askDelete(buildId: string): void {
+    this.errorMessage.set(null);
+    this.confirming.set(buildId);
+  }
+
+  cancelDelete(): void {
+    this.confirming.set(null);
+  }
+
+  confirmDelete(buildId: string): void {
+    const userId = this.auth.user()?.id;
+    if (!userId || this.deleting()) return;
+    this.deleting.set(buildId);
+    this.resumeBuild.deleteSession(userId, buildId).subscribe({
+      next: () => {
+        this.sessions.update((list) =>
+          list.filter((session) => session.buildId !== buildId),
+        );
+        this.deleting.set(null);
+        this.confirming.set(null);
+      },
+      error: () => {
+        this.deleting.set(null);
+        this.confirming.set(null);
+        this.errorMessage.set('Unable to delete that session right now.');
+      },
+    });
+  }
 
   ngOnInit(): void {
     const userId = this.auth.user()?.id;
