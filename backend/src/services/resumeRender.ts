@@ -150,8 +150,39 @@ conclusion after the search, never instead of it.`;
 
 interface RenderedResume {
   pdf: Uint8Array<ArrayBuffer>;
+  layout: ResumePdfLayout | null;
   /** null when the generator's diagnostics could not be read. */
   fill: ResumeFillReport | null;
+}
+
+export interface ResumePdfLayout {
+  pageWidth: number;
+  pageHeight: number;
+  fontSize: number;
+  /** Generator coordinates: x, last baseline from the bottom, width, height. */
+  elements: Record<string, [number, number, number, number]>;
+}
+
+export function parsePdfLayout(stdout: string): ResumePdfLayout | null {
+  try {
+    const value = JSON.parse(stdout);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const pageWidth = asNumber(value.page_width);
+    const pageHeight = asNumber(value.page_height);
+    const fontSize = asNumber(value.font_size_used);
+    if (!pageWidth || pageWidth <= 0 || !pageHeight || pageHeight <= 0 ||
+        !fontSize || fontSize <= 0 || !value.element_boxes ||
+        typeof value.element_boxes !== "object" || Array.isArray(value.element_boxes)) return null;
+    const elements: ResumePdfLayout["elements"] = Object.create(null);
+    for (const [id, box] of Object.entries(value.element_boxes)) {
+      if (!id || !Array.isArray(box) || box.length !== 4 ||
+          !box.every((n) => asNumber(n) !== null) || box[2] < 0 || box[3] <= 0) continue;
+      elements[id] = box as [number, number, number, number];
+    }
+    return { pageWidth, pageHeight, fontSize, elements };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -196,7 +227,11 @@ export async function renderResume(
     }
 
     const fileBuffer = await readFile(outputPath);
-    return { pdf: Uint8Array.from(fileBuffer), fill: parseFillReport(stdout) };
+    return {
+      pdf: Uint8Array.from(fileBuffer),
+      fill: parseFillReport(stdout),
+      layout: parsePdfLayout(stdout),
+    };
   } finally {
     await unlink(outputPath).catch(() => undefined);
   }

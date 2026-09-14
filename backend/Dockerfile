@@ -19,7 +19,7 @@ ENV PYTHON_BIN=/opt/venv/bin/python3
 
 # Node deps first for better layer caching.
 COPY backend/package*.json ./backend/
-RUN cd backend && npm install
+RUN cd backend && npm ci
 
 # Backend source + generate the Prisma client into backend/generated/prisma.
 COPY backend ./backend
@@ -29,5 +29,10 @@ RUN cd backend && npx prisma generate
 WORKDIR /usr/src/app/backend
 EXPOSE 3000
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+
+USER node
+
 # Apply pending migrations, then start via tsx (tsconfig sets noEmit).
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/index.ts"]
+CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/start.ts"]

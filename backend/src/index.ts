@@ -2,15 +2,12 @@ import express from 'express';
 import session from "express-session";
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import dotenv from 'dotenv';
-import { PrismaClient } from '../generated/prisma/client.js';
-import { PrismaPg } from '@prisma/adapter-pg';
-import pg from 'pg';
 import cors from 'cors';
 import userRouter from './routes/user_routes.ts';
 import resumeAIRouter1 from './routes/resumeAI1.js';
 import resumeWorkflowRouter from './routes/resumeWorkflowRoutes.js';
 import authSession from "./auth/session.js";
-import { SESSION_TTL_SECONDS, sessionStore } from "./lib/sessionStore.js";
+import { checkSessionStore, SESSION_TTL_SECONDS, sessionStore } from "./lib/sessionStore.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { LocalAuthError, requestLoginCode, verifyLoginCode } from './lib/localAuth.js';
 import { sendLoginCodeEmail } from './lib/mailer.js';
@@ -18,15 +15,14 @@ import { sendLoginCodeEmail } from './lib/mailer.js';
 import profileRouter from './routes/profile_routes.ts';
 
 import paymentRouter, { stripeWebhook } from './routes/payment_routes.js';
+import { createHealthRouter } from './routes/health.js';
+import prisma from './lib/prisma.js';
 
 
 
 dotenv.config();
 
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-const adapter = new PrismaPg(pool);
 const app = express();
-const prisma = new PrismaClient({ adapter });
 const PORT = process.env.PORT || 3000;
 
 function safeClientPath(value: unknown): string {
@@ -45,6 +41,16 @@ app.use(
   cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:4200',
     credentials: true,
+  }),
+);
+app.use(
+  '/api/health',
+  createHealthRouter({
+    checkDatabase: async () => {
+      await prisma.$queryRaw`SELECT 1`;
+      return true;
+    },
+    checkRedis: checkSessionStore,
   }),
 );
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
@@ -235,4 +241,15 @@ app.use('/api/profile', requireAuth, profileRouter);
 
 app.use('/api/payments', requireAuth, paymentRouter);
 
-app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
+const server = app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
+
+async function shutdown(signal: string): Promise<void> {
+  console.log(`[api] ${signal} received; stopping gracefully`);
+  server.close(async () => {
+    await prisma.$disconnect();
+    process.exit(0);
+  });
+}
+
+process.once('SIGTERM', () => void shutdown('SIGTERM'));
+process.once('SIGINT', () => void shutdown('SIGINT'));

@@ -9,7 +9,9 @@ This project is a simple full-stack resume builder setup with:
 - Redis 8 for BullMQ jobs, LangGraph checkpoints, and progress streams
 - A separate resume worker process
 
-The current smoke test verifies that the frontend, backend, and database are connected correctly. When the test button is clicked, the frontend asks the backend to create a dummy user, the backend inserts that user into PostgreSQL, counts the total users, and sends the count back to the frontend.
+The application supports passwordless and Google authentication, structured
+profiles, asynchronous AI-assisted resume builds, PDF generation, saved
+resumes, and Stripe subscription access.
 
 ## Prerequisites
 
@@ -82,7 +84,7 @@ This tells Prisma how to connect to the PostgreSQL database running in Docker.
 From the `backend` folder, run:
 
 ```bash
-npm install
+npm ci
 ```
 
 ## 4. Create or Update the Database Tables
@@ -90,39 +92,29 @@ npm install
 Still inside the `backend` folder, run:
 
 ```bash
-npx prisma migrate dev
+npm run db:setup
 ```
 
-The command name contains the word `migrate`, but the practical meaning here is: "make the real database match `schema.prisma`."
+This runs two separate steps:
 
-This reads `backend/prisma/schema.prisma` and updates the actual PostgreSQL database so its tables match the models in that file.
+- `prisma migrate deploy` applies pending SQL migrations from `backend/prisma/migrations` to the database configured by `DATABASE_URL`.
+- `prisma generate` regenerates the TypeScript client from `schema.prisma` so the backend can query those tables.
 
-In this project, the Prisma schema defines models like `User` and `Resume`. Running `npx prisma migrate dev` makes sure the real database has matching tables, columns, indexes, and relationships.
+The schema is a description of the database. Generating the client does not create
+the actual tables: the migrations do that. Use `npm run db:setup` on first setup
+and after pulling database changes. It applies existing migrations without
+creating new ones or resetting the database.
 
-For example, if `schema.prisma` says there is a `User` model, this command makes sure PostgreSQL has a real `User` table. If the schema says a user has an `email` field, this command makes sure the table has an `email` column.
-
-Use this command when:
-
-- setting up the project for the first time
-- changing `backend/prisma/schema.prisma`
-- adding, removing, or editing database tables/columns/relations
-
-If needed, regenerate the Prisma client:
+When you intentionally edit `schema.prisma`, create and apply a new migration in
+your development database, then regenerate the client:
 
 ```bash
+npx prisma migrate dev --name describe_your_change
 npx prisma generate
 ```
 
-This does not change the database. It regenerates the TypeScript Prisma client code that the backend imports and uses to query the database.
-
-Use `npx prisma generate` when:
-
-- the generated Prisma client is missing
-- TypeScript cannot find the generated Prisma client
-- you changed `schema.prisma` but did not run the command that updates the real database tables
-- you pulled new Prisma schema changes from someone else
-
-Most of the time, `npx prisma migrate dev` also runs `prisma generate` automatically afterward. That is why `npx prisma generate` is usually only needed as a repair/regeneration command.
+Include the schema change and its migration in version control together. Prisma 7
+does not run `prisma generate` automatically after `prisma migrate dev`.
 
 ## 5. Start the Backend Server
 
@@ -131,6 +123,11 @@ From the `backend` folder, run:
 ```bash
 npm run dev
 ```
+
+`npm run dev` automatically runs `db:setup` before starting the server. If migration
+or client generation fails, startup stops so requests cannot reach an outdated
+database. Start PostgreSQL first. After pulling new migrations while the server
+is running, restart `npm run dev` to run setup again.
 
 The backend should start on:
 
@@ -163,21 +160,19 @@ submits decisions. PostgreSQL stores only durable profile changes and the final
 resume; transient drafts, reviews, and progress events expire from Redis after
 three days.
 
-You can test the backend with:
+You can test the backend with its public liveness endpoint:
 
 ```bash
-curl http://localhost:3000/api/users/count
+curl http://localhost:3000/api/health
 ```
 
-Expected response:
+Expected response includes:
 
 ```json
-{
-  "count": 0
-}
+{ "status": "ok" }
 ```
 
-The number may be higher if users already exist in your database.
+Database readiness is available at `GET /api/health/ready`.
 
 ## 6. Install Frontend Dependencies
 
@@ -190,7 +185,7 @@ cd frontend
 Install dependencies:
 
 ```bash
-npm install
+npm ci
 ```
 
 ## 7. Start the Angular Frontend
@@ -211,20 +206,19 @@ Open that URL in your browser.
 
 ## 8. Test the Full Flow
 
-Click the test button in the frontend.
+Check `GET /api/health/ready`, sign in, create or import a profile, start a
+resume build, respond to the coach review, and download the generated PDF. A
+complete run exercises the frontend, API, PostgreSQL, Redis, background worker,
+AI providers, and PDF generator.
 
-Expected behavior:
-
-```text
-1. The Angular frontend sends a POST request to the backend.
-2. The Express backend creates a dummy user.
-3. Prisma inserts the user into PostgreSQL.
-4. The backend counts the total users in the User table.
-5. The backend sends the count back to Angular.
-6. Angular updates the number displayed on the page.
-```
-
-If the number increases after each click, the frontend, backend, and database are connected correctly.
+The resume editor renders the saved PDF using a locally hosted PDF.js worker.
+Pencil buttons outside the sheet align with the first line of each bullet and
+focus its form field. The adjacent hamburger handle moves the bullet's entire
+section; the up/down arrow keys provide the same operation when a handle is
+focused. Opening the editor or saving changes regenerates the PDF and returns
+its exact bytes together with the generator's measured positions. The controls
+stay disabled while changes are waiting to be saved, so they cannot reorder
+sections using an outdated preview. Zoom and Fit change only the preview size.
 
 ## Useful Commands
 
@@ -266,11 +260,11 @@ cd frontend
 npm start
 ```
 
-Create or update the database tables from `schema.prisma`:
+Apply existing database migrations and regenerate the client:
 
 ```bash
 cd backend
-npx prisma migrate dev
+npm run db:setup
 ```
 
 Regenerate Prisma client:
@@ -288,6 +282,21 @@ npx prisma studio
 ```
 
 ## Troubleshooting
+
+### The table `public.Subscription` does not exist
+
+The backend has subscription query code, but the connected database is missing
+the table. From `backend`, run:
+
+```bash
+npx prisma migrate status
+npm run db:setup
+```
+
+The migration `20260911000000_track_stripe_subscriptions` creates the subscription
+table, status enum, indexes, and user relationship. `prisma generate` alone cannot
+fix a missing table. If migrations are already up to date, verify that the server
+and Prisma CLI use the same `DATABASE_URL`.
 
 ### Database `peteryan` does not exist
 
@@ -339,34 +348,10 @@ Make sure the frontend is running on:
 http://localhost:4200
 ```
 
-The backend should allow CORS from the Angular frontend:
+The backend should allow CORS from the configured Angular origin:
 
-```ts
-app.use(cors({ origin: 'http://localhost:4200' }));
-```
-
-### Frontend Page Does Not Update After the API Succeeds
-
-Check that the backend response field matches the frontend code.
-
-For example, if the backend sends:
-
-```json
-{
-  "totalCount": 5
-}
-```
-
-then the frontend should read:
-
-```ts
-response.totalCount
-```
-
-not:
-
-```ts
-response.count
+```env
+FRONTEND_URL="http://localhost:4200"
 ```
 
 ### `NG0908: In this configuration Angular requires Zone.js`

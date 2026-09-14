@@ -8,3 +8,8 @@
   margin: 1.25rem auto 0;
   padding-bottom: 2rem;
 }
+
+// The editor needs room for both its form and a full PDF sheet plus controls.
+.app-content:has(app-resume-editor-page) {
+  width: min(1800px, calc(100vw - 2.5rem));
+}

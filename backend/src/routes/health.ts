@@ -13,6 +13,8 @@ import { Router, type Request, type Response } from "express";
 export interface HealthDeps {
   /** Resolves true when the database answers a trivial query. */
   checkDatabase: () => Promise<boolean>;
+  /** Redis backs authentication sessions, queues, and active build state. */
+  checkRedis?: () => Promise<boolean>;
   /** Seconds the process has been running. Injectable to keep tests stable. */
   uptime?: () => number;
 }
@@ -33,18 +35,22 @@ export function createHealthRouter(deps: HealthDeps): Router {
   });
 
   // Readiness: can this instance actually serve requests? Reports 503 when the
-  // database is unreachable so a proxy can stop sending it traffic.
+  // database or Redis is unreachable so a proxy can stop sending it traffic.
   router.get("/ready", async (_req: Request, res: Response) => {
     let database = false;
-    try {
-      database = await deps.checkDatabase();
-    } catch {
-      database = false;
-    }
+    let redis = false;
+    const [databaseResult, redisResult] = await Promise.allSettled([
+      deps.checkDatabase(),
+      deps.checkRedis?.() ?? Promise.resolve(true),
+    ]);
+    if (databaseResult.status === "fulfilled") database = databaseResult.value;
+    if (redisResult.status === "fulfilled") redis = redisResult.value;
 
-    res.status(database ? 200 : 503).json({
-      status: database ? "ready" : "not-ready",
+    const ready = database && redis;
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "ready" : "not-ready",
       database: database ? "up" : "down",
+      redis: redis ? "up" : "down",
     });
   });
 

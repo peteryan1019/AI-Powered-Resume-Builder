@@ -133,12 +133,24 @@ export interface EditableResumeResponse {
 }
 
 export interface RegenerateResumeResponse {
+  preview: ResumePdfPreview;
   resume: {
     id: string;
     title: string;
     templateId: string;
     updatedAt: string;
   };
+}
+
+export interface ResumePdfPreview {
+  pdfBase64: string;
+  content: ResumeContent;
+  layout: {
+    pageWidth: number;
+    pageHeight: number;
+    fontSize: number;
+    elements: Record<string, [number, number, number, number]>;
+  } | null;
 }
 
 @Injectable({

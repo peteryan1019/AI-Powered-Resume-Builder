@@ -35,6 +35,9 @@ export async function sendLoginCodeEmail(to: string, code: string): Promise<void
 
   // Dev fallback: no API key → print the code so local sign-in still works.
   if (!resend) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('RESEND_API_KEY is required in production.');
+    }
     console.log(`[mailer] RESEND_API_KEY not set — login code for ${to}: ${code}`);
     return;
   }

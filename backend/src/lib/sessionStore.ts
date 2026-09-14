@@ -24,6 +24,10 @@ const client = new Redis(REDIS_URL, { maxRetriesPerRequest: 3 });
 // client reconnects on its own.
 client.on("error", (error) => console.error("[session-store]", error));
 
+export async function checkSessionStore(): Promise<boolean> {
+  return (await client.ping()) === "PONG";
+}
+
 /**
  * Session storage backed by Redis instead of express-session's default
  * MemoryStore. MemoryStore keeps sessions in this process's heap, so every

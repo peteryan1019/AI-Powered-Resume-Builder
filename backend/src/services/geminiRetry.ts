@@ -3,9 +3,16 @@ export const FASTEST_GEMINI_TEXT_MODEL = "gemini-3.1-flash-lite";
 // The coach grades the draft, which is the one step worth a reasoning model.
 // Gemini 3.1 Pro is only published under the -preview id; plain
 // "gemini-3.1-pro" returns 404 from the API. It also needs a paid key:
-// the free-tier keys (APIKEY_1/2) return 429 for this model, which is why
+// the free-tier feature keys return 429 for this model, which is why
 // the coach reads COACH_KEY rather than sharing APIKEY_2.
 export const COACH_GEMINI_MODEL = "gemini-3.1-pro-preview";
+
+// The writer drafts and revises the resume (tailorResume in test-gemini.ts,
+// reviseResume in check-gemini.ts). It runs on Pro for the same reason the
+// coach does, and carries the same two constraints: the id must be the
+// -preview one, and the key must be paid -- see WRITER_KEY in test-gemini.ts
+// and check-gemini.ts.
+export const WRITER_GEMINI_MODEL = "gemini-3.1-pro-preview";
 
 // The profile agent reads what the user typed and decides whether it names
 // something their profile is missing. Extraction, not judgement, so the fast

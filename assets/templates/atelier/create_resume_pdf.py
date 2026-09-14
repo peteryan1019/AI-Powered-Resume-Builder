@@ -663,6 +663,7 @@ def create_resume_pdf(output_path: str, RESUME_DATA: Optional[dict] = None,
         # Lets a caller convert the two blank bands into a fill ratio
         # without assuming a paper size.
         "page_height": round(PAGE_H, 1),
+        "page_width": round(PAGE_W, 1),
     })
     if not result["fits_one_page"]:
         result["warning"] = "Content still overflows one page. Shorten or remove optional bullets."

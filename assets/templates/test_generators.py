@@ -69,6 +69,19 @@ class TestRendersSample(unittest.TestCase):
                     self.assertEqual(result["sections_rendered"], 4)
                     self.assertGreaterEqual(result["font_size_used"], 8.0)
                     self.assertGreaterEqual(result["top_margin"], 0)
+                    self.assertEqual(result["page_width"], 612)
+                    self.assertEqual(result["page_height"], 792)
+                    # Every visible bullet must retain its stable editor ID and
+                    # measured bounds; positions drive the external PDF controls.
+                    for section in SAMPLE["sections"]:
+                        bullets = section.get("bullets", []) if section["type"] == "bullets" else [
+                            b for entry in section["entries"] for b in entry["bullets"]
+                        ]
+                        for bullet in bullets:
+                            box = result["element_boxes"][bullet["id"]]
+                            self.assertEqual(len(box), 4)
+                            self.assertGreater(box[3], 0)
+                            self.assertGreaterEqual(box[1], 0)
 
     def test_margins_are_balanced(self):
         for name, gen in GENERATORS.items():

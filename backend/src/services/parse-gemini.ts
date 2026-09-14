@@ -6,7 +6,7 @@ import { FASTEST_GEMINI_TEXT_MODEL } from "./geminiRetry.js"
 const GEMINI_API_KEY = process.env.APIKEY_3;
 
 if (!GEMINI_API_KEY) {
-  throw new Error("dnwkdnk");
+  throw new Error("APIKEY_3 is required for PDF resume extraction.");
 }
 const Prompt = `
 Perform lossless resume extraction. Preserve the meaning, ownership, and

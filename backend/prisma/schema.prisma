@@ -25,6 +25,7 @@ model User {
   avatarUrl String?
   stripeCustomerId String?
   payments Payment[]
+  subscriptions Subscription[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -65,11 +66,37 @@ model Payment {
   paidAt DateTime?
 }
 
+model Subscription {
+  id                   String             @id @default(uuid())
+  userId               String
+  user                 User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSubscriptionId String             @unique
+  stripeCustomerId     String
+  status               SubscriptionStatus
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([stripeCustomerId])
+}
+
 enum PaymentStatus {
   PENDING
   PAID
   FAILED
   CANCELED
+}
+
+enum SubscriptionStatus {
+  INCOMPLETE
+  INCOMPLETE_EXPIRED
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  UNPAID
+  PAUSED
 }
 
 // DEPRECATED: local auth is now passwordless (email OTP), so no new rows are

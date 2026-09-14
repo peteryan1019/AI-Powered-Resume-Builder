@@ -2,6 +2,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { afterAll, beforeAll, vi } from 'vitest';
 
 import { BuildStatusPage } from './build-status-page';
 import { CoachReview, ProfileProposal } from './resume-build.service';
@@ -10,6 +11,20 @@ const USER = 'user-1';
 const BUILD = 'build-1';
 const PROPOSALS_URL = `/api/users/${USER}/resumes/${BUILD}/profile-proposals`;
 const DECISIONS_URL = `/api/users/${USER}/resumes/${BUILD}/decisions`;
+
+/**
+ * EventSource is a browser API that jsdom does not implement. The component
+ * reconnects after a successful feedback request, so rendering or submitting
+ * in a unit test legitimately reaches this boundary. Stub the boundary rather
+ * than deleting useful UI tests or allowing asynchronous ReferenceErrors.
+ */
+class FakeEventSource {
+  addEventListener(): void {}
+  close(): void {}
+}
+
+beforeAll(() => vi.stubGlobal('EventSource', FakeEventSource));
+afterAll(() => vi.unstubAllGlobals());
 
 /** Two recommendations: one answerable freely, one that needs input. */
 function review(): CoachReview {
@@ -300,6 +315,26 @@ describe('BuildStatusPage feedback', () => {
     component.decisionFor('rec-b').decision = 'reject';
     component.decisionFor('rec-b').specification = '';
     expect(component.canSubmitFeedback(r)).toBe(true);
+  });
+
+  it('labels a required approval reply as required', async () => {
+    await fixture.whenStable();
+    Object.assign(component as never, { userId: USER, jobId: BUILD });
+    component.review.set(review());
+    await fixture.whenStable();
+
+    const recommendations = Array.from(
+      (fixture.nativeElement as HTMLElement).querySelectorAll<HTMLElement>('.recommendation'),
+    );
+    const requiredRecommendation = recommendations[1]!;
+    requiredRecommendation.querySelector<HTMLButtonElement>('.choice-row button')!.click();
+    await fixture.whenStable();
+
+    const reply = requiredRecommendation.querySelector<HTMLElement>('.user-reply')!;
+    const textarea = reply.querySelector<HTMLTextAreaElement>('textarea')!;
+    expect(reply.textContent).toContain('What information should the writer use? (required)');
+    expect(reply.textContent).not.toContain('(optional)');
+    expect(textarea.required).toBe(true);
   });
 
   it('renders the reply box on a REJECT, with no project form in sight', async () => {

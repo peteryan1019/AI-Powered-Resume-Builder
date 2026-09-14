@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildFillBudgetBlock,
   parseFillReport,
+  parsePdfLayout,
   resolveGeneratorPath,
   TARGET_FILL_PERCENT,
   type ResumeFillReport,
@@ -22,6 +23,29 @@ const ATELIER_FIXTURE_STDOUT = JSON.stringify({
   top_margin: 165.0,
   bottom_margin: 165.1,
   page_height: 792.0,
+});
+
+describe("parsePdfLayout", () => {
+  it("preserves measured positions including wrapped bullets and page dimensions", () => {
+    const layout = parsePdfLayout(JSON.stringify({
+      page_width: 612, page_height: 792, font_size_used: 10.5,
+      element_boxes: { bullet: [60, 540, 506, 35.7], section: [46, 600, 520, 9.8] },
+    }));
+    expect(layout).toEqual({
+      pageWidth: 612, pageHeight: 792, fontSize: 10.5,
+      elements: { bullet: [60, 540, 506, 35.7], section: [46, 600, 520, 9.8] },
+    });
+  });
+  it.each(['', 'null', '{}', '[]', '{"page_width":0}', 'not json'])("rejects invalid diagnostics: %s", stdout => {
+    expect(parsePdfLayout(stdout)).toBeNull();
+  });
+  it("omits malformed boxes instead of sending invalid control coordinates", () => {
+    const layout = parsePdfLayout(JSON.stringify({
+      page_width: 612, page_height: 792, font_size_used: 10,
+      element_boxes: { good: [40, 500, 500, 10], short: [0, 0], bad: [0, '500', 20, 10], negative: [0, 0, -1, 10] },
+    }));
+    expect(Object.keys(layout!.elements)).toEqual(['good']);
+  });
 });
 
 describe("parseFillReport", () => {

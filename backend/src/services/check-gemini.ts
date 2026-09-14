@@ -2,7 +2,7 @@ import { loadResumeTemplate } from "../lib/templateRegistry.js";
 import { loadResumeSchema } from "../lib/schema.js";
 import type { Prisma } from "../../generated/prisma/client.js";
 import {
-  FASTEST_GEMINI_TEXT_MODEL,
+  WRITER_GEMINI_MODEL,
   retryAiModelRequest,
 } from "./geminiRetry.js";
 import { parseAndValidateResumeOutput } from "./resumeSchemaValidation.js";
@@ -15,12 +15,19 @@ import {
 import "dotenv/config";
 
 import { GoogleGenAI } from "@google/genai";
-// This service performs the writer's revision pass. The independent coach uses
-// COACH_KEY in coach-gemini.ts and never rewrites the resume itself.
-const GEMINI_API_KEY = process.env.APIKEY_1;
+// This service performs the writer's revision pass. The independent coach
+// grades in coach-gemini.ts and never rewrites the resume itself.
+// The writer runs on WRITER_GEMINI_MODEL, a Pro model, so it needs a PAID key:
+// the free-tier APIKEY_* keys have no quota for Pro and return 429. WRITER_KEY
+// lets the writer bill separately from the coach; it falls back to COACH_KEY so
+// a single paid key still works.
+const GEMINI_API_KEY = process.env.WRITER_KEY ?? process.env.COACH_KEY;
 
 if (!GEMINI_API_KEY) {
-  throw new Error("Request failed");
+  throw new Error(
+    "WRITER_KEY (or COACH_KEY) is required for the resume writer: a paid " +
+      "Gemini key with WRITER_GEMINI_MODEL quota.",
+  );
 }
 
 export type { TailorResumeInput } from "./jobPost.js";
@@ -82,7 +89,7 @@ truthful, and better targeted.`;
 
   return retryAiModelRequest("finalize resume", async () => {
     const interaction = await ai.interactions.create({
-      model: FASTEST_GEMINI_TEXT_MODEL,
+      model: WRITER_GEMINI_MODEL,
 
 input: `
 ${role}
@@ -132,49 +139,6 @@ ${fillBudgetBlock}
 Run all five passes below as internal reasoning. Do not output the critique.
 Output only the revised resume JSON and its "skillAudit" property.
 
-PASS 1 — TRUTH AND FIELD-BY-FIELD PROVENANCE.
-
-Treat the draft as completely untrusted. The presence of a claim in the draft
-is not evidence that the claim is true, even when it is realistic,
-conventional, or professionally worded.
-
-Check every candidate claim in the draft independently against the verified
-profile.
-
-The verified profile is the only source of facts about the candidate. The job
-posting is only a source of the target title, requirements, responsibilities,
-and vocabulary. The root skeleton is only a structural template. Neither the
-draft, posting, nor skeleton may supply missing candidate facts.
-
-A claim is supported only when it appears in the specific matching profile
-entry to which the draft assigns it. A fact appearing elsewhere in the profile
-does not support transferring it to another entry.
-
-ENTRY-SCOPED FACTS VERSUS AGGREGATE FACTS.
-
-The rule above governs ENTRY-SCOPED facts: a location, date, GPA, employer,
-role, job title, metric, outcome, or responsibility. Each belongs to exactly one
-profile entry, and the draft moving one to a different entry makes the resume
-false. Nothing below relaxes that.
-
-A skill or technology is an AGGREGATE fact. Command of a tool is demonstrated by
-every entry that used it; it is not owned by any single entry. A technical
-skills section is an index over the whole profile, so a skill in it is supported
-when ANY part of the verified profile names it — a SKILLS entry, a
-"Technologies:" list inside a work or project description, a role or project
-summary, an accomplishment bullet, or education coursework. It does not have to
-come from a SKILLS entry, and the SKILLS entries are not a ceiling on what the
-section may contain.
-
-Do not treat a skill as unsupported merely because the draft drew it from
-somewhere other than a SKILLS entry. That is the intended behaviour of the
-drafting stage, not a defect to correct.
-
-This exception is scoped to the technical skills section and to the NAMES of
-skills and technologies. It never licenses a location, date, GPA, employer,
-metric, or achievement moving between entries, and it never licenses attributing
-a technology to a work or project entry that does not name it.
-
 THE TECHNICAL SKILLS SECTION IS AUDITED, NOT EDITED FOR GROUNDING.
 
 This review is being used to measure how well the drafting stage grounds the
@@ -200,9 +164,6 @@ For every retained resume entry:
   2. Verify each field and bullet against that same source entry.
   3. Preserve supported facts, allowing truthful rephrasing.
   4. Delete or empty every field that cannot be traced to that source entry.
-
-If the source entry is ambiguous or cannot be identified, fail closed: remove
-the unsupported claim instead of assuming that it is correct.
 
 The one exception is a skill in the technical skills section. There, fail open
 and report: keep the skill, and record it in "skillAudit" with "grounded" set to

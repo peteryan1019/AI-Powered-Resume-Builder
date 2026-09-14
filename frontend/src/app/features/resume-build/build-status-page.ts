@@ -124,11 +124,16 @@ function emptyDecision(): DecisionDraft {
                   {{
                     decisionFor(item.id).decision === 'reject'
                       ? 'Why not? The coach reads this before its next review. (optional)'
-                      : 'Anything the writer should know? (optional)'
+                      : item.requiresUserInput
+                        ? 'What information should the writer use? (required)'
+                        : 'Anything the writer should know? (optional)'
                   }}
                   <textarea
                     rows="3"
                     maxlength="2000"
+                    [required]="
+                      decisionFor(item.id).decision === 'accept' && item.requiresUserInput
+                    "
                     [(ngModel)]="decisionFor(item.id).specification"
                   ></textarea>
                 </label>

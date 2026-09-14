@@ -4,11 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "dev:worker": "tsx watch src/resume-workflow/worker.ts",
+    "db:setup": "prisma migrate deploy && prisma generate",
+    "predev": "npm run db:setup",
+    "dev": "tsx watch src/start.ts",
+    "dev:worker": "tsx watch src/resume-workflow/start-worker.ts",
     "build": "tsc",
-    "start": "tsx src/index.ts",
-    "start:worker": "tsx src/resume-workflow/worker.ts",
+    "start": "tsx src/start.ts",
+    "start:worker": "tsx src/resume-workflow/start-worker.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
@@ -20,8 +22,8 @@
     "@google/genai": "^2.11.0",
     "@langchain/langgraph": "^1.4.13",
     "@langchain/langgraph-checkpoint-redis": "^1.0.11",
-    "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.8.0",
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
     "ajv": "^8.20.0",
     "bullmq": "^6.3.2",
     "connect-redis": "^7.1.1",
@@ -31,12 +33,12 @@
     "express-rate-limit": "^8.6.2",
     "express-session": "^1.19.0",
     "ioredis": "^6.0.0",
-    "multer": "^2.2.0",
+    "multer": "^2.3.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.21.0",
     "resend": "^6.18.1",
-    "stripe": "^22.3.1",
+    "stripe": "^22.6.2",
     "tsx": "^4.22.4"
   },
   "devDependencies": {
@@ -49,9 +51,13 @@
     "@types/passport-google-oauth20": "^2.0.17",
     "@types/pg": "^8.20.0",
     "@types/supertest": "^7.2.1",
-    "prisma": "^7.8.0",
+    "prisma": "^7.10.0",
     "supertest": "^7.2.2",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "deepmerge-ts": "^8.0.2",
+    "mysql2": "^3.24.4"
   }
 }

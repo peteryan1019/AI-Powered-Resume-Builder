@@ -85,26 +85,27 @@ services:
       DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/resumebuilder"
       REDIS_URL: "redis://redis:6379"
       SECRETKEY: "${SECRETKEY:?SECRETKEY must be set}"
+      SESSION_TTL_SECONDS: "${SESSION_TTL_SECONDS:-604800}"
       FRONTEND_URL: "${FRONTEND_URL:?FRONTEND_URL must be set}"
       BACKEND_URL: "${BACKEND_URL:?BACKEND_URL must be set}"
-      RESEND_API_KEY: "${RESEND_API_KEY}"
-      MAIL_FROM: "${MAIL_FROM}"
-      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID}"
-      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET}"
-      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY}"
-      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET}"
-      STRIPE_PRICE_ID: "${STRIPE_PRICE_ID}"
-      APIKEY_1: "${APIKEY_1}"
-      APIKEY_2: "${APIKEY_2}"
-      APIKEY_3: "${APIKEY_3}"
+      RESEND_API_KEY: "${RESEND_API_KEY:?RESEND_API_KEY must be set}"
+      MAIL_FROM: "${MAIL_FROM:?MAIL_FROM must be set}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:?GOOGLE_CLIENT_ID must be set}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:?GOOGLE_CLIENT_SECRET must be set}"
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY must be set}"
+      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET must be set}"
+      STRIPE_PRICE_ID: "${STRIPE_PRICE_ID:?STRIPE_PRICE_ID must be set}"
+      APIKEY_2: "${APIKEY_2:?APIKEY_2 must be set}"
+      APIKEY_3: "${APIKEY_3:?APIKEY_3 must be set}"
       COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
+      WRITER_KEY: "${WRITER_KEY:-}"
     logging: *default-logging
 
   resume-worker:
     image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
     container_name: resume-worker
     restart: unless-stopped
-    command: ["npx", "tsx", "src/resume-workflow/worker.ts"]
+    command: ["npx", "tsx", "src/resume-workflow/start-worker.ts"]
     depends_on:
       db:
         condition: service_healthy
@@ -115,9 +116,8 @@ services:
       DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/resumebuilder"
       REDIS_URL: "redis://redis:6379"
       RESUME_WORKER_CONCURRENCY: "${RESUME_WORKER_CONCURRENCY:-2}"
-      APIKEY_1: "${APIKEY_1}"
-      APIKEY_2: "${APIKEY_2}"
       COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
+      WRITER_KEY: "${WRITER_KEY:-}"
     logging: *default-logging
 
   frontend:
@@ -125,7 +125,8 @@ services:
     container_name: frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     expose:
       - 80
     environment:

@@ -651,7 +651,7 @@ router.post(
         return res.status(404).json({error: "Resume not found."});
       }
 
-      const { pdf: pdfData } = await renderResume(
+      const { pdf: pdfData, layout } = await renderResume(
         resume.content,
         resume.templateId,
       );
@@ -681,7 +681,13 @@ router.post(
         }
       });
 
-      return res.status(200).json({resume: updatedResume});
+      // Return the bytes and coordinates from the same render that was saved.
+      // The editor must never pair positions from one version with another PDF.
+      res.setHeader("Cache-Control", "no-store, private");
+      return res.status(200).json({
+        resume: updatedResume,
+        preview: { pdfBase64: Buffer.from(pdfData).toString("base64"), layout, content: resume.content },
+      });
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : "Unknown error";
 

@@ -9,6 +9,15 @@ function appWith(checkDatabase: () => Promise<boolean>) {
   return app;
 }
 
+function appWithRedis(checkRedis: () => Promise<boolean>) {
+  const app = express();
+  app.use(
+    "/api/health",
+    createHealthRouter({ checkDatabase: async () => true, checkRedis, uptime: () => 42.7 }),
+  );
+  return app;
+}
+
 describe("GET /api/health (liveness)", () => {
   it("reports ok while the process is running", async () => {
     const res = await request(appWith(async () => true)).get("/api/health");
@@ -48,5 +57,11 @@ describe("GET /api/health/ready (readiness)", () => {
     ).get("/api/health/ready");
     expect(res.status).toBe(503);
     expect(res.body.database).toBe("down");
+  });
+
+  it("returns 503 when Redis cannot serve sessions and queued builds", async () => {
+    const res = await request(appWithRedis(async () => false)).get("/api/health/ready");
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({ status: "not-ready", database: "up", redis: "down" });
   });
 });

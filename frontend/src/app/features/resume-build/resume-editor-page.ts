@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject, signal, ElementRef } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal, ElementRef, DestroyRef } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { AuthService } from '../auth/auth.service';
@@ -14,14 +15,14 @@ import {
   type EditableResumeResponse,
   type ContactPart,
 } from '../../services/resume.service';
-import { ResumeLivePreview } from './resume-live-preview';
-import { DomSanitizer, type SafeResourceUrl } from '@angular/platform-browser';
-import { finalize, switchMap, tap } from 'rxjs';
+import { ResumePdfPreviewComponent } from './resume-pdf-preview';
+import type { RenderedResumePreview, SectionMove } from './resume-pdf-layout';
+import { finalize, of, switchMap, tap } from 'rxjs';
 
 @Component({
   selector: 'app-resume-editor-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, ResumeLivePreview],
+  imports: [CommonModule, FormsModule, RouterLink, ResumePdfPreviewComponent],
   template: `
     <section class="editor-page">
       <header class="editor-header">
@@ -353,6 +354,18 @@ import { finalize, switchMap, tap } from 'rxjs';
                             (focus)="highlightElement(bullet.id)"
                             (blur)="clearHighlight()"
                           ></textarea>
+                        </label>
+
+                        <label>
+                          URL
+                          <input
+                            type="text"
+                            placeholder="https://example.com"
+                            [(ngModel)]="bullet.url"
+                            [attr.data-editor-id]="bullet.id"
+                            (focus)="highlightElement(bullet.id)"
+                            (blur)="clearHighlight()"
+                          />
                         </label>
                       </div>
 
@@ -693,15 +706,14 @@ import { finalize, switchMap, tap } from 'rxjs';
         </main>
 
         <aside class="preview-panel">
-          <h2>Resume preview</h2>
-
-          <app-resume-live-preview
-            [content]="loadedResume.content"
-            [templateId]="loadedResume.templateId"
+          <a class="download-link" [href]="downloadUrl()" download="resume.pdf">Download PDF</a>
+          <app-resume-pdf-preview
+            [preview]="pdfPreview()"
             [activeElementId]="activeElementId()"
-            [additionalHighlightedIds]="swapElementIds()"
+            [busy]="saving() || dirty()"
             (elementSelected)="focusEditorElement($event)"
-          ></app-resume-live-preview>
+            (sectionMoved)="reorderSection($event)"
+          ></app-resume-pdf-preview>
         </aside>
       </div>
     </section>
@@ -986,6 +998,7 @@ import { finalize, switchMap, tap } from 'rxjs';
 
       .editing-panel,
       .preview-panel {
+        min-width: 0;
         padding: 1.25rem;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 1rem;
@@ -997,13 +1010,10 @@ import { finalize, switchMap, tap } from 'rxjs';
         top: 1rem;
       }
 
-      .preview-panel app-resume-live-preview {
-        display: block;
-        width: 100%;
-        max-height: calc(100vh - 10rem);
-        overflow: auto;
-        border-radius: 0.5rem;
-        background: white;
+      .download-link {
+        display: inline-block;
+        margin-bottom: 1rem;
+        font-size: .85rem;
       }
 
       @media (max-width: 1100px) {
@@ -1022,7 +1032,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly auth = inject(AuthService);
   private readonly resumeService = inject(ResumeService);
-  private readonly sanitizer = inject(DomSanitizer);
+  private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
   private userId: string | null = null;
@@ -1036,7 +1046,8 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
   readonly saving = signal(false);
   readonly errorMessage = signal<string | null>(null);
   readonly successMessage = signal<string | null>(null);
-  readonly pdfURL = signal<SafeResourceUrl | null>(null);
+  readonly pdfPreview = signal<RenderedResumePreview | null>(null);
+  readonly downloadUrl = signal('');
   readonly resume = signal<EditableResumeResponse['resume'] | null>(null);
   readonly activeElementId = signal<string | null>(null);
   readonly swapElementIds = signal<readonly string[]>([]);
@@ -1051,9 +1062,9 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
       return;
     }
 
-    this.refreshPdfPreview();
+    this.downloadUrl.set(this.resumeService.getPdfUrl(this.userId, this.resumeId));
 
-    this.resumeService.getResumeForEditing(this.userId, this.resumeId).subscribe({
+    this.resumeService.getResumeForEditing(this.userId, this.resumeId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: ({ resume }) => {
         if (typeof resume.content.jobPostTitle !== 'string') {
           resume.content.jobPostTitle = resume.title ?? '';
@@ -1062,6 +1073,9 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
         this.ensureEditableContactParts(resume.content);
         this.resume.set(resume);
         this.loading.set(false);
+        // Regenerate once on open so older saved resumes also get coordinates.
+        // The response contains the exact bytes persisted for download.
+        this.performSave(true);
       },
       error: (error) => {
         this.loading.set(false);
@@ -1273,7 +1287,19 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
     }, 1500);
   }
 
-  private performSave(): void {
+  reorderSection({ sectionId, beforeSectionId }: SectionMove): void {
+    const sections = this.resume()?.content.sections;
+    if (!sections || sectionId === beforeSectionId) return;
+    const source = sections.findIndex(s => s.id === sectionId);
+    const target = beforeSectionId === null ? sections.length : sections.findIndex(s => s.id === beforeSectionId);
+    if (source < 0 || target < 0) return;
+    const destination = target > source ? target - 1 : target;
+    if (source === destination) return;
+    sections.splice(destination, 0, ...sections.splice(source, 1));
+    this.scheduleAutoSave();
+  }
+
+  private performSave(regenerateOnly = false): void {
     const currentResume = this.resume();
 
     if (!this.userId || !this.resumeId || !currentResume) {
@@ -1287,6 +1313,7 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
 
     const userId = this.userId;
     const resumeId = this.resumeId;
+    const snapshot = structuredClone(currentResume.content);
     let contentSaved = false;
 
     this.saving.set(true);
@@ -1294,29 +1321,33 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
     this.errorMessage.set(null);
     this.successMessage.set(null);
 
-    this.resumeService
-      .updateResume(userId, resumeId, currentResume.content)
+    (regenerateOnly ? of({ resume: currentResume }) : this.resumeService.updateResume(userId, resumeId, snapshot))
       .pipe(
-        tap(({ resume }) => {
+        tap(() => {
           contentSaved = true;
-          this.resume.set(resume);
+          // Keep the live form: a response may be older than keystrokes entered
+          // while this request was in flight. The next save captures those edits.
         }),
         switchMap(() => this.resumeService.regenerateResume(userId, resumeId)),
+        takeUntilDestroyed(this.destroyRef),
         finalize(() => {
           this.saving.set(false);
 
-          if (this.save) {
+          if (this.save && !this.destroyRef.destroyed) {
             this.save = false;
             this.performSave();
           }
         }),
       )
       .subscribe({
-        next: () => {
-          this.refreshPdfPreview();
-          this.successMessage.set('Changes saved and preview refreshed.');
+        next: ({ preview, resume }) => {
+          this.pdfPreview.set(preview);
+          const live = this.resume();
+          if (live) this.resume.set({ ...live, title: resume.title });
+          if (!this.dirty() && !this.save) this.successMessage.set('Changes saved and PDF preview refreshed.');
         },
         error: (error) => {
+          this.dirty.set(true);
           const fallback = contentSaved
             ? 'Changes were saved, but the PDF could not be regenerated.'
             : 'Unable to save this resume.';
@@ -1334,19 +1365,6 @@ export class ResumeEditorPage implements OnInit, OnDestroy {
 
     this.dirty.set(true);
     this.performSave();
-  }
-
-  private refreshPdfPreview(): void {
-    if (!this.userId || !this.resumeId) {
-      return;
-    }
-
-    const rawpdfURL =
-      this.resumeService.getPdfUrl(this.userId, this.resumeId) +
-      `?version=${Date.now()}` +
-      `#toolbar=0&navpanes=0&view=FitH`;
-
-    this.pdfURL.set(this.sanitizer.bypassSecurityTrustResourceUrl(rawpdfURL));
   }
 
   displayId(id: string): string {
