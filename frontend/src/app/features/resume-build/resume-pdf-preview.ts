@@ -153,7 +153,10 @@ export class ResumePdfPreviewComponent implements AfterViewInit, OnChanges, OnDe
       await previous?.destroy();
       const pdfjs = await import('pdfjs-dist');
       if (generation !== this.generation) return;
-      pdfjs.GlobalWorkerOptions.workerSrc = new URL('assets/pdfjs/pdf.worker.min.mjs', document.baseURI).href;
+      // Keep the worker URL versioned. Apart from matching the installed PDF.js
+      // release, a new URL prevents browsers from reusing response metadata
+      // cached before the server knew that .mjs files are JavaScript modules.
+      pdfjs.GlobalWorkerOptions.workerSrc = new URL('assets/pdfjs/v6.3.289/pdf.worker.min.mjs', document.baseURI).href;
       task = pdfjs.getDocument({
         data: Uint8Array.from(atob(preview.pdfBase64), c => c.charCodeAt(0)),
         standardFontDataUrl: new URL('assets/pdfjs/standard_fonts/', document.baseURI).href,
