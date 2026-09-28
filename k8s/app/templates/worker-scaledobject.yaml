@@ -46,7 +46,10 @@ spec:
   triggers:
     - type: redis
       metadata:
-        address: redis:6379
+        # KEDA resolves this address from its controller pod in the `keda`
+        # namespace, not from the worker's namespace. Use a cluster-qualified
+        # service name so DNS cannot accidentally look for `redis.keda`.
+        address: redis.{{ .Release.Namespace }}.svc.cluster.local:6379
         listName: {{ .Values.worker.autoscaling.listName | quote }}
         listLength: {{ .Values.worker.autoscaling.listLength | quote }}
         activationListLength: "0"
