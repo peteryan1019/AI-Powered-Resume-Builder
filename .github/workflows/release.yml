@@ -176,7 +176,7 @@ jobs:
             --values k8s/app/values-aws.yaml \
             --set-string images.backend.tag="$GITHUB_SHA" \
             --set-string images.frontend.tag="$GITHUB_SHA" \
-            --atomic --wait --timeout 15m
+            --rollback-on-failure --wait --timeout 15m
 
       - name: Verify the rollout
         if: steps.prerequisites.outputs.ready == 'true'

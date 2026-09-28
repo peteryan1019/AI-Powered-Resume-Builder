@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: resumebuilder-keda-deployer
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: resumebuilder
+    app.kubernetes.io/component: deployment-rbac
+rules:
+  - apiGroups: ["keda.sh"]
+    resources: ["scaledobjects"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

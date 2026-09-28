@@ -49,9 +49,10 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
 }
 
 resource "aws_eks_access_entry" "github_actions_deploy" {
-  cluster_name  = aws_eks_cluster.this.name
-  principal_arn = aws_iam_role.github_actions_deploy.arn
-  type          = "STANDARD"
+  cluster_name      = aws_eks_cluster.this.name
+  principal_arn     = aws_iam_role.github_actions_deploy.arn
+  type              = "STANDARD"
+  kubernetes_groups = ["resumebuilder-deployers"]
 }
 
 # The release workflow can administer application objects only inside the
@@ -66,6 +67,29 @@ resource "aws_eks_access_policy_association" "github_actions_deploy" {
     type       = "namespace"
     namespaces = ["resumebuilder"]
   }
+
+  depends_on = [aws_eks_access_entry.github_actions_deploy]
+}
+
+# EKS's managed namespace-admin policy covers built-in Kubernetes resources,
+# but intentionally does not grant access to arbitrary third-party custom
+# resources. The app chart contains a KEDA ScaledObject, so give the workflow's
+# Kubernetes group only the additional custom-resource permissions it needs.
+# This bootstrap release is installed by Terraform using the cluster creator's
+# credentials; the deployment workflow cannot grant permissions to itself.
+resource "helm_release" "github_actions_namespace_rbac" {
+  name             = "resumebuilder-github-actions-rbac"
+  namespace        = "resumebuilder"
+  create_namespace = true
+  chart            = "${path.module}/../k8s/deploy-rbac"
+
+  atomic  = true
+  wait    = true
+  timeout = 300
+
+  values = [yamlencode({
+    groupName = "resumebuilder-deployers"
+  })]
 
   depends_on = [aws_eks_access_entry.github_actions_deploy]
 }
