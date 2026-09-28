@@ -8,11 +8,23 @@ import {
 } from "./geminiRetry.js";
 
 // Extraction, not judgement, so this runs on the fast free-tier key rather than
-// the coach's paid one.
-const apiKey = process.env.APIKEY_2;
-if (!apiKey)
-  throw new Error("APIKEY_2 is required for the profile agent.");
-const ai = new GoogleGenAI({ apiKey });
+// the coach's paid one. Create the client only when this feature is used: this
+// module also exports pure helpers, and importing those helpers must not require
+// a production credential. Application startup validates the complete runtime
+// environment separately (see lib/environment.ts).
+let ai: GoogleGenAI | undefined;
+
+function getProfileAgentClient(): GoogleGenAI {
+  if (ai) return ai;
+
+  const apiKey = process.env.APIKEY_2;
+  if (!apiKey) {
+    throw new Error("APIKEY_2 is required for the profile agent.");
+  }
+
+  ai = new GoogleGenAI({ apiKey });
+  return ai;
+}
 
 /** The eight section types a profile entry can belong to. */
 export const PROFILE_SECTION_TYPES = [
@@ -191,7 +203,7 @@ export async function proposeProfileChanges(
   if (!written) return [];
 
   return retryAiModelRequest("profile agent", async () => {
-    const interaction = await ai.interactions.create({
+    const interaction = await getProfileAgentClient().interactions.create({
       model: PROFILE_AGENT_MODEL,
       input: `
 You read what a user typed while reviewing coaching feedback on their resume,
