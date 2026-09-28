@@ -8,5 +8,5 @@ metadata:
     app.kubernetes.io/component: deployment-rbac
 rules:
   - apiGroups: ["keda.sh"]
-    resources: ["scaledobjects"]
+    resources: ["scaledobjects", "triggerauthentications"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
