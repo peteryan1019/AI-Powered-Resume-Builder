@@ -1,5 +1,6 @@
 import RedisStore from "connect-redis";
 import { Redis } from "ioredis";
+import type { RedisReply } from "rate-limit-redis";
 import { REDIS_URL } from "./redisConfig.js";
 
 /**
@@ -26,6 +27,29 @@ client.on("error", (error) => console.error("[session-store]", error));
 
 export async function checkSessionStore(): Promise<boolean> {
   return (await client.ping()) === "PONG";
+}
+
+/**
+ * express-rate-limit's Redis adapter deliberately accepts a raw-command
+ * function rather than depending on one particular Redis client. Reusing the
+ * session client keeps one shared source of auth state and avoids opening yet
+ * another socket per API Pod.
+ */
+export async function sendSessionRedisCommand(
+  ...command: string[]
+): Promise<RedisReply> {
+  const [name, ...args] = command;
+  if (!name) throw new Error("A Redis command name is required.");
+  return (await client.call(name, ...args)) as RedisReply;
+}
+
+export async function closeSessionStore(): Promise<void> {
+  if (client.status === "end") return;
+  if (client.status !== "ready") {
+    client.disconnect();
+    return;
+  }
+  await client.quit();
 }
 
 /**

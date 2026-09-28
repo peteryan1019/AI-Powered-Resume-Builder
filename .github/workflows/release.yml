@@ -1,0 +1,188 @@
+name: Publish and deploy to EKS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - backend/**
+      - frontend/**
+      - assets/**
+      - k8s/app/**
+      - .github/workflows/ci.yml
+      - .github/workflows/release.yml
+  workflow_dispatch:
+
+# Jobs opt into only the permissions they need.
+permissions: {}
+
+env:
+  AWS_REGION: us-east-2
+  EKS_CLUSTER: resumebuilder
+  K8S_NAMESPACE: resumebuilder
+  BACKEND_IMAGE: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019
+  FRONTEND_IMAGE: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder-peteryan1019
+  AWS_DEPLOY_ROLE_ARN: arn:aws:iam::088146583859:role/resumebuilder-github-actions-deploy
+
+jobs:
+  ci:
+    name: Test
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: backend
+            context: .
+            dockerfile: backend/Dockerfile
+            image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019
+          - name: frontend
+            context: frontend
+            dockerfile: frontend/Dockerfile
+            image: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder-peteryan1019
+
+    steps:
+      - name: Check out the exact release commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Log in to GHCR for publishing
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and publish immutable and convenience tags
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ matrix.image }}:${{ github.sha }}
+            ${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          provenance: mode=max
+          sbom: true
+
+  deploy:
+    name: Deploy commit to EKS
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: resumebuilder-production
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the deployed chart
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Obtain short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@61815dcd50bd041e203e49132bacad1fd04d2708 # v5
+        with:
+          role-to-assume: ${{ env.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-${{ github.run_id }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@776406bce94f63e41d621b960d78ee25c8b76ede # v4
+        with:
+          version: v1.35.0
+
+      - name: Install Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
+        with:
+          version: v4.3.0
+
+      - name: Connect to EKS
+        run: aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER"
+
+      # The first push of this workflow is intentionally safe: it publishes the
+      # images but skips application deployment until the operator has created
+      # the app Secret and installed the data chart.
+      - name: Check one-time deployment prerequisites
+        id: prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=true
+          kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>&1 || ready=false
+          kubectl -n "$K8S_NAMESPACE" get secret resumebuilder-secrets >/dev/null 2>&1 || ready=false
+          kubectl -n "$K8S_NAMESPACE" get statefulset postgres >/dev/null 2>&1 || ready=false
+          kubectl -n "$K8S_NAMESPACE" get statefulset redis >/dev/null 2>&1 || ready=false
+          echo "ready=$ready" >> "$GITHUB_OUTPUT"
+
+      - name: Explain a safe first-run skip
+        if: steps.prerequisites.outputs.ready != 'true'
+        run: |
+          echo 'Images were published, but deployment was skipped.'
+          echo 'Create resumebuilder-secrets and install k8s/data, then rerun this workflow.'
+
+      - name: Validate private-package credentials
+        if: steps.prerequisites.outputs.ready == 'true'
+        env:
+          GHCR_READ_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$GHCR_READ_USERNAME" || { echo 'Missing repository secret GHCR_READ_USERNAME'; exit 1; }
+          test -n "$GHCR_READ_TOKEN" || { echo 'Missing repository secret GHCR_READ_TOKEN'; exit 1; }
+
+      - name: Refresh the GHCR image-pull Secret
+        if: steps.prerequisites.outputs.ready == 'true'
+        env:
+          GHCR_READ_USERNAME: ${{ secrets.GHCR_READ_USERNAME }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          kubectl -n "$K8S_NAMESPACE" create secret docker-registry ghcr-pull \
+            --docker-server=ghcr.io \
+            --docker-username="$GHCR_READ_USERNAME" \
+            --docker-password="$GHCR_READ_TOKEN" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Lint the application chart
+        if: steps.prerequisites.outputs.ready == 'true'
+        run: helm lint k8s/app --values k8s/app/values-aws.yaml
+
+      - name: Deploy the immutable commit
+        if: steps.prerequisites.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          helm upgrade --install resumebuilder-app k8s/app \
+            --namespace "$K8S_NAMESPACE" \
+            --values k8s/app/values-aws.yaml \
+            --set-string images.backend.tag="$GITHUB_SHA" \
+            --set-string images.frontend.tag="$GITHUB_SHA" \
+            --atomic --wait --timeout 15m
+
+      - name: Verify the rollout
+        if: steps.prerequisites.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          kubectl -n "$K8S_NAMESPACE" get pods,svc,ingress,pvc
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/resumebuilder-api --timeout=5m
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/resumebuilder-frontend --timeout=5m
+          kubectl -n "$K8S_NAMESPACE" rollout status deployment/resumebuilder-worker --timeout=5m

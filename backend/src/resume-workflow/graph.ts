@@ -368,6 +368,7 @@ async function finalizeNode(state: State): Promise<Partial<State>> {
   return { resumeId: resume.id };
 }
 
+let checkpointerPromise: Promise<RedisSaver> | undefined;
 let graphPromise: Promise<ReturnType<typeof createGraph>> | undefined;
 
 function createGraph(checkpointer: RedisSaver) {
@@ -398,16 +399,30 @@ export async function getResumeWorkflowGraph() {
   // A rejected promise is neither null nor undefined, so `??=` would treat one
   // as "already built" and hand the same failure to every later job. Clear the
   // cache on failure so the next job gets a fresh attempt.
-  graphPromise ??= RedisSaver.fromUrl(REDIS_URL, {
+  checkpointerPromise ??= RedisSaver.fromUrl(REDIS_URL, {
     defaultTTL: Math.ceil(WORKFLOW_TTL_SECONDS / 60),
     refreshOnRead: true,
-  })
-    .then((checkpointer) => createGraph(checkpointer))
+  }).catch((error) => {
+    checkpointerPromise = undefined;
+    throw error;
+  });
+  graphPromise ??= checkpointerPromise
+    .then(createGraph)
     .catch((error) => {
       graphPromise = undefined;
       throw error;
     });
   return graphPromise;
+}
+
+/** Close the node-redis connection owned internally by RedisSaver. */
+export async function closeResumeWorkflowGraph(): Promise<void> {
+  const activeCheckpointer = checkpointerPromise;
+  checkpointerPromise = undefined;
+  graphPromise = undefined;
+  if (!activeCheckpointer) return;
+  const checkpointer = await activeCheckpointer;
+  await checkpointer.end();
 }
 
 /**

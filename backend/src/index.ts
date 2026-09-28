@@ -1,13 +1,21 @@
 import express from 'express';
 import session from "express-session";
 import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
+import { RedisStore as RateLimitRedisStore } from "rate-limit-redis";
 import dotenv from 'dotenv';
 import cors from 'cors';
 import userRouter from './routes/user_routes.ts';
 import resumeAIRouter1 from './routes/resumeAI1.js';
 import resumeWorkflowRouter from './routes/resumeWorkflowRoutes.js';
 import authSession from "./auth/session.js";
-import { checkSessionStore, SESSION_TTL_SECONDS, sessionStore } from "./lib/sessionStore.js";
+import {
+  checkSessionStore,
+  closeSessionStore,
+  sendSessionRedisCommand,
+  SESSION_TTL_SECONDS,
+  sessionStore,
+} from "./lib/sessionStore.js";
+import { closeHttpServer } from "./lib/httpShutdown.js";
 import { requireAuth } from "./middleware/requireAuth.js";
 import { LocalAuthError, requestLoginCode, verifyLoginCode } from './lib/localAuth.js';
 import { sendLoginCodeEmail } from './lib/mailer.js';
@@ -17,6 +25,9 @@ import profileRouter from './routes/profile_routes.ts';
 import paymentRouter, { stripeWebhook } from './routes/payment_routes.js';
 import { createHealthRouter } from './routes/health.js';
 import prisma from './lib/prisma.js';
+import { closeResumeWorkflowGraph } from "./resume-workflow/graph.js";
+import { closeResumeQueue } from "./resume-workflow/queue.js";
+import { closeWorkflowRedis } from "./resume-workflow/redis.js";
 
 
 
@@ -24,6 +35,7 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+let shuttingDown = false;
 
 function safeClientPath(value: unknown): string {
   const path = typeof value === 'string' ? value : '/home';
@@ -51,6 +63,7 @@ app.use(
       return true;
     },
     checkRedis: checkSessionStore,
+    isShuttingDown: () => shuttingDown,
   }),
 );
 app.post('/webhooks/stripe', express.raw({ type: 'application/json' }), stripeWebhook);
@@ -90,6 +103,10 @@ const authIpLimiter = rateLimit({
   limit: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RateLimitRedisStore({
+    sendCommand: sendSessionRedisCommand,
+    prefix: "rate-limit:auth-ip:",
+  }),
   message: { error: 'Too many attempts. Please try again later.', code: 'rate_limited' },
 });
 // Key a limiter by the request's email, falling back to the IP. ipKeyGenerator
@@ -106,6 +123,10 @@ const requestCodeLimiter = rateLimit({
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RateLimitRedisStore({
+    sendCommand: sendSessionRedisCommand,
+    prefix: "rate-limit:request-code:",
+  }),
   keyGenerator: byEmailOrIp,
   message: { error: 'Too many code requests. Please try again later.', code: 'rate_limited' },
 });
@@ -117,13 +138,16 @@ const verifyCodeLimiter = rateLimit({
   skipSuccessfulRequests: true,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RateLimitRedisStore({
+    sendCommand: sendSessionRedisCommand,
+    prefix: "rate-limit:verify-code:",
+  }),
   keyGenerator: byEmailOrIp,
   message: { error: 'Too many attempts. Please try again later.', code: 'rate_limited' },
 });
 
-// Note: express-rate-limit's default in-memory store is per-process and resets
-// on restart — fine for a single droplet. Back it with a shared store (Redis /
-// connect-pg-simple) if this ever runs on more than one instance.
+// These counters live in Redis, so adding another API Pod cannot multiply the
+// allowed login attempts or reset all limits during a rolling deployment.
 
 // Mount the user routes
 app.use('/api/users', requireAuth, userRouter);
@@ -243,12 +267,33 @@ app.use('/api/payments', requireAuth, paymentRouter);
 
 const server = app.listen(PORT, () => console.log(`API running on http://localhost:${PORT}`));
 
+let shutdownPromise: Promise<void> | undefined;
+
 async function shutdown(signal: string): Promise<void> {
-  console.log(`[api] ${signal} received; stopping gracefully`);
-  server.close(async () => {
-    await prisma.$disconnect();
-    process.exit(0);
-  });
+  if (shutdownPromise) return shutdownPromise;
+  shuttingDown = true;
+  console.log(`[api] ${signal} received; draining HTTP requests`);
+
+  shutdownPromise = (async () => {
+    const serverResult = await Promise.allSettled([closeHttpServer(server)]);
+    const cleanupResults = await Promise.allSettled([
+      closeResumeQueue(),
+      closeResumeWorkflowGraph(),
+      closeWorkflowRedis(),
+      closeSessionStore(),
+      prisma.$disconnect(),
+    ]);
+    const failures = [...serverResult, ...cleanupResults].filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    for (const failure of failures) {
+      console.error("[api] shutdown cleanup failed", failure.reason);
+    }
+    if (failures.length) process.exitCode = 1;
+    console.log("[api] shutdown complete");
+  })();
+
+  return shutdownPromise;
 }
 
 process.once('SIGTERM', () => void shutdown('SIGTERM'));

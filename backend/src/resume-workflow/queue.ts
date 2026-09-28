@@ -1,7 +1,6 @@
 import { Queue, type JobsOptions } from "bullmq";
 import { REDIS_URL } from "./redis.js";
-
-export const RESUME_BUILD_QUEUE = "resume-builds-v1";
+import { RESUME_BUILD_QUEUE } from "./constants.js";
 
 const connection = { url: REDIS_URL };
 const queue = new Queue(RESUME_BUILD_QUEUE, { connection });

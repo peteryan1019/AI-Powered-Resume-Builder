@@ -22,6 +22,19 @@ export function getRedis(): Redis {
   return redis;
 }
 
+export async function checkWorkflowRedis(): Promise<boolean> {
+  return (await redis.ping()) === "PONG";
+}
+
+export async function closeWorkflowRedis(): Promise<void> {
+  if (redis.status === "end") return;
+  if (redis.status !== "ready") {
+    redis.disconnect();
+    return;
+  }
+  await redis.quit();
+}
+
 export function buildMetaKey(buildId: string): string {
   return `resume:build:${buildId}:meta`;
 }

@@ -174,6 +174,21 @@ Expected response includes:
 
 Database readiness is available at `GET /api/health/ready`.
 
+The worker has separate probe endpoints on port `3001`:
+
+```bash
+curl http://localhost:3001/health
+curl http://localhost:3001/health/ready
+```
+
+For container deployments, database migration is intentionally separate from
+API startup. `docker compose up` runs the one-shot `migrate` service first;
+Kubernetes deployments should run `npm run db:migrate:deploy` from the backend
+image in a Job before updating the API or worker Deployments.
+
+The production Kubernetes charts, secret template, deployment order, and
+worker autoscaling explanation are in [`k8s/README.md`](k8s/README.md).
+
 ## 6. Install Frontend Dependencies
 
 Open a new terminal. From the project root, go into the frontend folder:

@@ -1,0 +1,31 @@
+existingSecret: resumebuilder-secrets
+
+storageClass:
+  create: true
+  name: resumebuilder-gp3
+  # Retain means deleting the Helm release does not delete the EBS disks.
+  reclaimPolicy: Retain
+
+postgres:
+  image: postgres:17
+  database: resumebuilder
+  user: postgres
+  storage: 20Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+redis:
+  image: redis:8.2-alpine
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi

@@ -64,4 +64,22 @@ describe("GET /api/health/ready (readiness)", () => {
     expect(res.status).toBe(503);
     expect(res.body).toMatchObject({ status: "not-ready", database: "up", redis: "down" });
   });
+
+  it("becomes unready immediately when graceful shutdown begins", async () => {
+    const app = express();
+    app.use(
+      "/api/health",
+      createHealthRouter({
+        checkDatabase: async () => true,
+        checkRedis: async () => true,
+        isShuttingDown: () => true,
+      }),
+    );
+    const res = await request(app).get("/api/health/ready");
+    expect(res.status).toBe(503);
+    expect(res.body).toMatchObject({
+      status: "not-ready",
+      reason: "shutting-down",
+    });
+  });
 });

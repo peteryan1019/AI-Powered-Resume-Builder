@@ -1,0 +1,56 @@
+{{- if .Values.worker.autoscaling.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: resumebuilder-worker-redis
+  labels:
+    {{- include "resumebuilder-app.labels" . | nindent 4 }}
+spec:
+  secretTargetRef:
+    - parameter: password
+      name: {{ .Values.existingSecret }}
+      key: REDIS_PASSWORD
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: resumebuilder-worker
+  labels:
+    {{- include "resumebuilder-app.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    name: resumebuilder-worker
+  pollingInterval: {{ .Values.worker.autoscaling.pollingInterval }}
+  cooldownPeriod: {{ .Values.worker.autoscaling.cooldownPeriod }}
+  minReplicaCount: {{ .Values.worker.autoscaling.minReplicas }}
+  maxReplicaCount: {{ .Values.worker.autoscaling.maxReplicas }}
+  fallback:
+    # If KEDA temporarily cannot query Redis, keep one worker instead of
+    # silently losing all capacity.
+    failureThreshold: 3
+    replicas: {{ max 1 .Values.worker.autoscaling.minReplicas }}
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleDown:
+          # A claimed BullMQ job disappears from the waiting list immediately.
+          # Keep the higher replica count long enough for in-flight AI work to
+          # finish instead of scaling those workers down underneath it.
+          stabilizationWindowSeconds: 600
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 30
+  triggers:
+    - type: redis
+      metadata:
+        address: redis:6379
+        listName: {{ .Values.worker.autoscaling.listName | quote }}
+        listLength: {{ .Values.worker.autoscaling.listLength | quote }}
+        activationListLength: "0"
+        databaseIndex: "0"
+      authenticationRef:
+        name: resumebuilder-worker-redis
+{{- end }}

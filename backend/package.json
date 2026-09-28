@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "db:setup": "prisma migrate deploy && prisma generate",
+    "db:migrate:deploy": "prisma migrate deploy",
     "predev": "npm run db:setup",
     "dev": "tsx watch src/start.ts",
     "dev:worker": "tsx watch src/resume-workflow/start-worker.ts",
@@ -37,6 +38,7 @@
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.21.0",
+    "rate-limit-redis": "^6.0.1",
     "resend": "^6.18.1",
     "stripe": "^22.6.2",
     "tsx": "^4.22.4"

@@ -1,0 +1,17 @@
+{{- if .Values.storageClass.create }}
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Values.storageClass.name }}
+  labels:
+    {{- include "resumebuilder-data.labels" . | nindent 4 }}
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  encrypted: "true"
+reclaimPolicy: {{ .Values.storageClass.reclaimPolicy }}
+allowVolumeExpansion: true
+# Delay EBS creation until the Pod is assigned to a node. EBS volumes belong
+# to one availability zone, so this prevents creating a disk in the wrong AZ.
+volumeBindingMode: WaitForFirstConsumer
+{{- end }}

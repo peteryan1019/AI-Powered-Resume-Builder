@@ -27,12 +27,13 @@ RUN cd backend && npx prisma generate
 
 # Run from backend/ so the code's "../assets/..." paths resolve to /usr/src/app/assets.
 WORKDIR /usr/src/app/backend
-EXPOSE 3000
+EXPOSE 3000 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:3000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 USER node
 
-# Apply pending migrations, then start via tsx (tsconfig sets noEmit).
-CMD ["sh", "-c", "npx prisma migrate deploy && npx tsx src/start.ts"]
+# Schema changes are a one-shot deployment concern. The API process only serves
+# HTTP; Compose and Kubernetes run `npm run db:migrate:deploy` as a separate job.
+CMD ["node", "--import", "tsx", "src/start.ts"]

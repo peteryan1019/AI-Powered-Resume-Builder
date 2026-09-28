@@ -1,0 +1,15 @@
+# Non-secret production settings used by GitHub Actions. Image tags are set to
+# the immutable Git commit SHA by the release workflow.
+imagePullSecrets:
+  - ghcr-pull
+
+config:
+  frontendUrl: https://resume-builder.dev
+  backendUrl: https://resume-builder.dev
+
+ingress:
+  enabled: true
+  className: alb
+  host: resume-builder.dev
+  certificateArn: arn:aws:acm:us-east-2:088146583859:certificate/177bf166-299c-498e-ad43-2a6e74d44d89
+  scheme: internet-facing

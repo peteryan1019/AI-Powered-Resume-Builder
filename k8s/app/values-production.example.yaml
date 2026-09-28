@@ -1,0 +1,19 @@
+# Copy this to values-production.yaml (gitignored), fill in the certificate ARN,
+# and deploy immutable image tags rather than `latest`.
+images:
+  backend:
+    tag: REPLACE_WITH_BACKEND_IMAGE_GIT_SHA
+  frontend:
+    tag: REPLACE_WITH_FRONTEND_IMAGE_GIT_SHA
+
+config:
+  frontendUrl: https://resume-builder.dev
+  backendUrl: https://resume-builder.dev
+
+ingress:
+  host: resume-builder.dev
+  certificateArn: arn:aws:acm:us-east-1:123456789012:certificate/REPLACE_ME
+
+# Uncomment if the two GHCR packages are private.
+# imagePullSecrets:
+#   - ghcr-pull

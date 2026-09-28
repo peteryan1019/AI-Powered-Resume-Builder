@@ -17,11 +17,14 @@ export interface HealthDeps {
   checkRedis?: () => Promise<boolean>;
   /** Seconds the process has been running. Injectable to keep tests stable. */
   uptime?: () => number;
+  /** True after shutdown begins, so load balancers stop sending new work. */
+  isShuttingDown?: () => boolean;
 }
 
 export function createHealthRouter(deps: HealthDeps): Router {
   const router = Router();
   const uptime = deps.uptime ?? (() => process.uptime());
+  const isShuttingDown = deps.isShuttingDown ?? (() => false);
 
   // Liveness: is the process up and serving? Deliberately depends on nothing
   // else, so a database outage never causes the container to be killed and
@@ -37,6 +40,16 @@ export function createHealthRouter(deps: HealthDeps): Router {
   // Readiness: can this instance actually serve requests? Reports 503 when the
   // database or Redis is unreachable so a proxy can stop sending it traffic.
   router.get("/ready", async (_req: Request, res: Response) => {
+    if (isShuttingDown()) {
+      res.status(503).json({
+        status: "not-ready",
+        reason: "shutting-down",
+        database: "unknown",
+        redis: "unknown",
+      });
+      return;
+    }
+
     let database = false;
     let redis = false;
     const [databaseResult, redisResult] = await Promise.allSettled([

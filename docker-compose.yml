@@ -69,13 +69,27 @@ services:
       retries: 10
     logging: *default-logging
 
+  # Run schema migrations exactly once before either long-running backend
+  # process starts. Kubernetes will use the same image/command in a Job.
+  migrate:
+    image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npm", "run", "db:migrate:deploy"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/resumebuilder"
+    logging: *default-logging
+
   backend:
     image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
     container_name: backend
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     expose:
@@ -105,10 +119,11 @@ services:
     image: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019:latest
     container_name: resume-worker
     restart: unless-stopped
-    command: ["npx", "tsx", "src/resume-workflow/start-worker.ts"]
+    # Invoke Node directly so it receives Kubernetes/Docker's SIGTERM as PID 1.
+    command: ["node", "--import", "tsx", "src/resume-workflow/start-worker.ts"]
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
     environment:
@@ -116,8 +131,21 @@ services:
       DATABASE_URL: "postgresql://postgres:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/resumebuilder"
       REDIS_URL: "redis://redis:6379"
       RESUME_WORKER_CONCURRENCY: "${RESUME_WORKER_CONCURRENCY:-2}"
+      WORKER_HEALTH_PORT: "3001"
       COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
       WRITER_KEY: "${WRITER_KEY:-}"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3001/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
     logging: *default-logging
 
   frontend:
@@ -132,6 +160,10 @@ services:
     environment:
       VIRTUAL_HOST: "${APP_DOMAIN:?APP_DOMAIN must be set}"
       LETSENCRYPT_HOST: "${APP_DOMAIN:?APP_DOMAIN must be set}"
+      # The image defaults to static-only routing for Kubernetes, where the ALB
+      # sends API paths directly to the backend Service. Compose still needs its
+      # frontend Nginx to proxy those paths to the backend container.
+      PROXY_API_TO_BACKEND: "true"
     logging: *default-logging
 
 volumes:

@@ -20,3 +20,23 @@ Redis Stream from the last event ID.
 PostgreSQL is used only for durable effects. `Resume.buildId` and
 `ProfileInstance.sourceBuildKey` are unique idempotency keys so a queue or HTTP
 retry cannot duplicate a final resume or a user-approved new project.
+
+## Process and orchestration contract
+
+The backend image supports three separate workloads; sharing an image does not
+put them in the same container or Pod:
+
+- API: `node --import tsx src/start.ts`
+- Resume worker: `node --import tsx src/resume-workflow/start-worker.ts`
+- Database migration job: `npm run db:migrate:deploy`
+
+The API never applies migrations during startup. Docker Compose runs the
+one-shot `migrate` service before starting the API and worker; Kubernetes must
+do the same with a Job before rolling out a new image.
+
+The worker exposes process liveness at `GET /health` and dependency readiness
+at `GET /health/ready` on `WORKER_HEALTH_PORT` (default `3001`). On SIGTERM it
+becomes unready immediately, stops fetching BullMQ jobs, waits for active work,
+then closes the LangGraph checkpointer, Redis clients, health server, and
+Prisma. The orchestrator's termination grace period must be longer than the
+longest expected resume build.

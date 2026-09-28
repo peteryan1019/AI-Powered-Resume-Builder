@@ -1,13 +1,23 @@
 import "dotenv/config";
 import { UnrecoverableError, Worker, type Job } from "bullmq";
+import express from "express";
+import { closeHttpServer } from "../lib/httpShutdown.js";
 import prisma from "../lib/prisma.js";
+import { createWorkerHealthRouter } from "../routes/workerHealth.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
 import { AiModelUnavailableError } from "../services/geminiRetry.js";
 import { JobPostUnreadableError } from "../services/jobPost.js";
 import type { ResumeWorkflowResumeInput } from "./contracts.js";
-import { Command, getResumeWorkflowGraph, workflowConfig } from "./graph.js";
-import { RESUME_BUILD_QUEUE } from "./queue.js";
 import {
+  closeResumeWorkflowGraph,
+  Command,
+  getResumeWorkflowGraph,
+  workflowConfig,
+} from "./graph.js";
+import { RESUME_BUILD_QUEUE } from "./constants.js";
+import {
+  checkWorkflowRedis,
+  closeWorkflowRedis,
   getBuildInput,
   getResumeCommand,
   getReviewProjection,
@@ -162,10 +172,56 @@ worker.on("failed", (job, error) => {
 worker.on("error", (error) => console.error("[resume-worker]", error));
 console.log(`[resume-worker] listening with concurrency ${concurrency}`);
 
-async function shutdown(): Promise<void> {
-  await worker.close();
-  await prisma.$disconnect();
+const healthPort =
+  Number.parseInt(process.env.WORKER_HEALTH_PORT ?? "3001", 10) || 3001;
+let shuttingDown = false;
+const healthApp = express();
+healthApp.use(
+  createWorkerHealthRouter({
+    checkDatabase: async () => {
+      await prisma.$queryRaw`SELECT 1`;
+      return true;
+    },
+    checkRedis: checkWorkflowRedis,
+    isWorkerRunning: () => worker.isRunning(),
+    isShuttingDown: () => shuttingDown,
+  }),
+);
+const healthServer = healthApp.listen(healthPort, "0.0.0.0", () => {
+  console.log(`[resume-worker] health server listening on port ${healthPort}`);
+});
+
+let shutdownPromise: Promise<void> | undefined;
+
+async function shutdown(signal: string): Promise<void> {
+  if (shutdownPromise) return shutdownPromise;
+  shuttingDown = true;
+  console.log(
+    `[resume-worker] ${signal} received; stopping new jobs and draining active work`,
+  );
+
+  shutdownPromise = (async () => {
+    // BullMQ's graceful close stops fetching and waits for active jobs. Only
+    // after it resolves is it safe to close the graph, Redis, and database.
+    const workerResult = await Promise.allSettled([worker.close()]);
+    const cleanupResults = await Promise.allSettled([
+      closeResumeWorkflowGraph(),
+      closeWorkflowRedis(),
+      prisma.$disconnect(),
+      closeHttpServer(healthServer),
+    ]);
+    const failures = [...workerResult, ...cleanupResults].filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    for (const failure of failures) {
+      console.error("[resume-worker] shutdown cleanup failed", failure.reason);
+    }
+    if (failures.length) process.exitCode = 1;
+    console.log("[resume-worker] shutdown complete");
+  })();
+
+  return shutdownPromise;
 }
 
-process.once("SIGTERM", () => void shutdown());
-process.once("SIGINT", () => void shutdown());
+process.once("SIGTERM", () => void shutdown("SIGTERM"));
+process.once("SIGINT", () => void shutdown("SIGINT"));

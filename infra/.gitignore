@@ -1,0 +1,17 @@
+# State can contain sensitive infrastructure data and resource identifiers.
+# Never commit it.
+*.tfstate
+*.tfstate.*
+.terraform/
+terraform.tfvars
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored. Commit it — it pins
+# the exact provider versions so an apply from another machine resolves to the
+# same AWS provider build you tested with.

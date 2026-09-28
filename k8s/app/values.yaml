@@ -1,0 +1,71 @@
+existingSecret: resumebuilder-secrets
+
+images:
+  backend:
+    repository: ghcr.io/utsc-cscc09-programming-on-the-web/backend-resumebuilder-peteryan1019
+    # CI should override this with the immutable Git commit SHA.
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: ghcr.io/utsc-cscc09-programming-on-the-web/frontend-resumebuilder-peteryan1019
+    tag: latest
+    pullPolicy: IfNotPresent
+
+# Leave empty when the GHCR packages are public. For private packages, create
+# the secret described in k8s/README.md and set this to [ghcr-pull].
+imagePullSecrets: []
+
+config:
+  frontendUrl: https://resume-builder.dev
+  backendUrl: https://resume-builder.dev
+  sessionTtlSeconds: "604800"
+
+api:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 750m
+      memory: 768Mi
+
+frontend:
+  replicas: 1
+  resources:
+    requests:
+      cpu: 25m
+      memory: 32Mi
+    limits:
+      cpu: 250m
+      memory: 128Mi
+
+worker:
+  concurrency: 2
+  # Long AI calls must be allowed to finish if KEDA scales a Pod down.
+  terminationGracePeriodSeconds: 900
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    # BullMQ puts immediately runnable jobs in this Redis list.
+    listName: bull:resume-builds-v1:wait
+    # Aim for no more than two waiting jobs per worker Pod.
+    listLength: "2"
+    pollingInterval: 15
+    cooldownPeriod: 300
+
+ingress:
+  enabled: true
+  className: alb
+  host: resume-builder.dev
+  # Terraform Step 2 will output the ACM certificate ARN.
+  certificateArn: ""
+  scheme: internet-facing

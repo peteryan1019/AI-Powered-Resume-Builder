@@ -6,10 +6,14 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-# Serve the built files with NGINX and reverse-proxy the API to the backend.
+# Serve the built files with NGINX. Kubernetes uses ALB path routing; the
+# entrypoint selects the bundled reverse-proxy config only under Compose.
 FROM nginx:alpine
 COPY --from=build /app/dist/frontend/browser /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.compose.conf /etc/nginx/resumebuilder/nginx.compose.conf
+COPY docker-entrypoint.d/40-select-routing-mode.sh /docker-entrypoint.d/40-select-routing-mode.sh
+RUN chmod 755 /docker-entrypoint.d/40-select-routing-mode.sh
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -qO- http://127.0.0.1/ >/dev/null || exit 1

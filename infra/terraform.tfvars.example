@@ -1,0 +1,19 @@
+# Copy this file to terraform.tfvars. There are no secrets here; all values
+# already match the planned first production deployment, so edits are optional.
+
+aws_region         = "us-east-2"
+environment        = "production"
+cluster_name       = "resumebuilder"
+kubernetes_version = "1.35"
+domain_name        = "resume-builder.dev"
+
+# EKS needs two subnet AZs, but paid worker capacity starts in only one AZ.
+node_instance_types = ["t3a.medium"]
+node_min_size       = 1
+node_desired_size   = 1
+node_max_size       = 2
+node_volume_size_gib = 30
+
+# Keep this open while using GitHub-hosted Actions runners, whose egress IPs
+# change. This exposes only the authenticated Kubernetes API, not your app.
+cluster_public_access_cidrs = ["0.0.0.0/0"]

@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: resumebuilder-migrate
+  labels:
+    {{- include "resumebuilder-app.labels" . | nindent 4 }}
+    app.kubernetes.io/name: resumebuilder-migrate
+  annotations:
+    # Helm runs this to completion before installing or upgrading Deployments.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+    # Keep failures for inspection; remove successes and stale previous hooks.
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: resumebuilder-migrate
+        app.kubernetes.io/part-of: resumebuilder
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- include "resumebuilder-app.imagePullSecrets" . | nindent 6 }}
+      containers:
+        - name: migrate
+          image: {{ include "resumebuilder-app.backendImage" . | quote }}
+          imagePullPolicy: {{ .Values.images.backend.pullPolicy }}
+          command: ["npm", "run", "db:migrate:deploy"]
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.existingSecret }}
+                  key: DATABASE_URL
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
