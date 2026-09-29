@@ -6,10 +6,13 @@ import { Observable, catchError, from, map, of, switchMap, throwError } from 'rx
 type SubscriptionResponse = {
   active: boolean;
   status: string;
+  trialEndsAt: string;
 };
 
 type CheckoutResponse = {
   url?: string;
+  alreadyHasAccess?: boolean;
+  /** Kept temporarily for compatibility with an older deployed API. */
   alreadyPaid?: boolean;
   returnTo?: string;
 };
@@ -66,7 +69,7 @@ export class PaymentService {
       )
       .pipe(
         switchMap((response) => {
-          if (response.alreadyPaid) {
+          if (response.alreadyHasAccess || response.alreadyPaid) {
             return from(
               this.router.navigateByUrl(this.safeReturnTo(response.returnTo ?? returnTo)),
             ).pipe(map(() => void 0));

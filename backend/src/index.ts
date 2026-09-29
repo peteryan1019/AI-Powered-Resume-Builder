@@ -17,6 +17,7 @@ import {
 } from "./lib/sessionStore.js";
 import { closeHttpServer } from "./lib/httpShutdown.js";
 import { requireAuth } from "./middleware/requireAuth.js";
+import { requireSubscriptionAccess } from "./middleware/requireSubscriptionAccess.js";
 import { LocalAuthError, requestLoginCode, verifyLoginCode } from './lib/localAuth.js';
 import { sendLoginCodeEmail } from './lib/mailer.js';
 
@@ -261,7 +262,7 @@ app.post("/auth/logout", (req, res, next) => {
   });
 });
 
-app.use('/api/profile', requireAuth, profileRouter);
+app.use('/api/profile', requireAuth, requireSubscriptionAccess, profileRouter);
 
 app.use('/api/payments', requireAuth, paymentRouter);
 

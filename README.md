@@ -296,6 +296,16 @@ cd backend
 npx prisma studio
 ```
 
+### Subscription access and the free trial
+
+Every account can use paid features for seven full days from its database
+`User.createdAt` timestamp without visiting Stripe Checkout. The trial deadline
+is calculated on the backend, so signing out, requesting another login code, or
+starting a checkout session cannot reset it. After that deadline, an `ACTIVE`
+or `TRIALING` Stripe subscription is required. The frontend route guard handles
+navigation, while the profile and resume-workflow APIs enforce the same rule
+server-side.
+
 ## Troubleshooting
 
 ### The table `public.Subscription` does not exist

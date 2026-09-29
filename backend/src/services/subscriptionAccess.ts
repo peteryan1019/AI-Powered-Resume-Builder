@@ -18,25 +18,72 @@ const ACCESS_STATUSES: SubscriptionStatus[] = [
   SubscriptionStatus.TRIALING,
 ];
 
+export const FREE_TRIAL_DURATION_MS = 7 * 24 * 60 * 60 * 1_000;
+
+export type SubscriptionAccess = {
+  active: boolean;
+  status: SubscriptionStatus | "FREE_TRIAL" | "NONE";
+  trialEndsAt: string;
+};
+
+/**
+ * The product trial belongs to the Tailr account, not to Stripe. Deriving its
+ * deadline from the immutable account creation time means retries, logouts and
+ * starting (or canceling) Checkout can never reset the seven-day clock.
+ */
+export function getFreeTrialAccess(
+  userCreatedAt: Date,
+  now: Date = new Date(),
+): { active: boolean; trialEndsAt: string } {
+  const trialEndsAt = new Date(
+    userCreatedAt.getTime() + FREE_TRIAL_DURATION_MS,
+  );
+
+  return {
+    // The end is exclusive: at the exact deadline, paid access is required.
+    active: now.getTime() < trialEndsAt.getTime(),
+    trialEndsAt: trialEndsAt.toISOString(),
+  };
+}
+
 export function stripeStatusGrantsAccess(status: Stripe.Subscription.Status): boolean {
   return status === "active" || status === "trialing";
 }
 
-export async function getSubscriptionAccess(userId: string): Promise<{
-  active: boolean;
-  status: SubscriptionStatus | "NONE";
-}> {
+export async function getSubscriptionAccess(
+  user: { id: string; createdAt: Date },
+  now: Date = new Date(),
+): Promise<SubscriptionAccess> {
+  const trial = getFreeTrialAccess(user.createdAt, now);
   const active = await prisma.subscription.findFirst({
-    where: { userId, status: { in: ACCESS_STATUSES } },
+    where: { userId: user.id, status: { in: ACCESS_STATUSES } },
     orderBy: { updatedAt: "desc" },
   });
-  if (active) return { active: true, status: active.status };
+  if (active) {
+    return {
+      active: true,
+      status: active.status,
+      trialEndsAt: trial.trialEndsAt,
+    };
+  }
+
+  if (trial.active) {
+    return {
+      active: true,
+      status: "FREE_TRIAL",
+      trialEndsAt: trial.trialEndsAt,
+    };
+  }
 
   const latest = await prisma.subscription.findFirst({
-    where: { userId },
+    where: { userId: user.id },
     orderBy: { updatedAt: "desc" },
   });
-  return { active: false, status: latest?.status ?? "NONE" };
+  return {
+    active: false,
+    status: latest?.status ?? "NONE",
+    trialEndsAt: trial.trialEndsAt,
+  };
 }
 
 /**
@@ -46,10 +93,20 @@ export async function getSubscriptionAccess(userId: string): Promise<{
  */
 export async function refreshMissingSubscriptionAccess(
   stripe: Stripe,
-  user: { id: string; stripeCustomerId?: string | null },
-): Promise<{ active: boolean; status: SubscriptionStatus | "NONE" }> {
-  const local = await getSubscriptionAccess(user.id);
-  if (local.status !== "NONE" || !user.stripeCustomerId) return local;
+  user: {
+    id: string;
+    createdAt: Date;
+    stripeCustomerId?: string | null;
+  },
+): Promise<SubscriptionAccess> {
+  const local = await getSubscriptionAccess(user);
+  if (
+    local.status !== "NONE" ||
+    local.active ||
+    !user.stripeCustomerId
+  ) {
+    return local;
+  }
 
   const subscriptions = await stripe.subscriptions.list({
     customer: user.stripeCustomerId,
@@ -59,7 +116,7 @@ export async function refreshMissingSubscriptionAccess(
   for (const subscription of subscriptions.data) {
     await syncStripeSubscription(subscription, user.id);
   }
-  return getSubscriptionAccess(user.id);
+  return getSubscriptionAccess(user);
 }
 
 function objectId(value: string | { id: string } | null): string | null {

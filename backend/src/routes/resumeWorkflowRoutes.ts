@@ -43,8 +43,10 @@ import {
 } from "../services/profileAgent.js";
 import { getExportedProfile } from "../services/profileExportJSON.js";
 import type { JobPostSource } from "../services/jobPost.js";
+import { requireSubscriptionAccess } from "../middleware/requireSubscriptionAccess.js";
 
 const router = Router();
+router.use(requireSubscriptionAccess);
 const MIN_JOB_DESCRIPTION_LENGTH = 40;
 const MAX_JOB_DESCRIPTION_LENGTH = 30_000;
 const MAX_SPECIFICATION_LENGTH = 2_000;

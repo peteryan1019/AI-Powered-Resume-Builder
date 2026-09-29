@@ -28,7 +28,7 @@ router.post("/checkout", async (req: Request, res: Response) => {
 
     const access = await refreshMissingSubscriptionAccess(stripe, user);
     if (access.active) {
-      return res.json({ alreadyPaid: true, returnTo });
+      return res.json({ alreadyHasAccess: true, access, returnTo });
     }
 
     let customerId = user.stripeCustomerId;
