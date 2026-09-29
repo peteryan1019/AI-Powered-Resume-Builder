@@ -9,6 +9,8 @@ images:
 config:
   frontendUrl: https://resume-builder.dev
   backendUrl: https://resume-builder.dev
+  googleCloudProject: REPLACE_WITH_GOOGLE_CLOUD_PROJECT_ID
+  googleCloudLocation: global
 
 ingress:
   host: resume-builder.dev

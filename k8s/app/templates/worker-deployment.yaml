@@ -41,19 +41,15 @@ spec:
             - configMapRef:
                 name: resumebuilder-config
           env:
-            {{- range $name := list "DATABASE_URL" "REDIS_URL" "REDIS_PASSWORD" "COACH_KEY" }}
+            {{- range $name := list "DATABASE_URL" "REDIS_URL" "REDIS_PASSWORD" }}
             - name: {{ $name }}
               valueFrom:
                 secretKeyRef:
                   name: {{ $.Values.existingSecret }}
                   key: {{ $name }}
             {{- end }}
-            - name: WRITER_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.existingSecret }}
-                  key: WRITER_KEY
-                  optional: true
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /var/run/secrets/google/service-account.json
           startupProbe:
             httpGet:
               path: /health
@@ -84,6 +80,12 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: google-cloud-credentials
+              mountPath: /var/run/secrets/google
+              readOnly: true
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: google-cloud-credentials
+          secret:
+            secretName: {{ .Values.googleCredentialsSecret }}

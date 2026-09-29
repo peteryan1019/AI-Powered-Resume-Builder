@@ -67,6 +67,24 @@ kubectl -n resumebuilder create secret generic resumebuilder-secrets \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
+The AI services use Vertex AI through a downloaded Google Cloud service-account
+key. Keep that JSON file outside the repository and create a separate,
+file-backed Secret whose key is exactly `service-account.json`:
+
+```bash
+kubectl -n resumebuilder create secret generic resumebuilder-google-cloud \
+  --from-file=service-account.json=/ABSOLUTE/PATH/TO/service-account.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+The service account needs only the permissions required to call Vertex AI (for
+example, the Vertex AI User role) in the project configured as
+`config.googleCloudProject`. The API and worker mount this Secret read-only;
+the private key is never placed in Helm values or the container image. A
+downloaded service-account key is a long-lived credential, so rotate it if it
+may have been exposed and replace it with Workload Identity Federation before
+long-term production use.
+
 Generate URL-safe passwords so no percent-encoding is needed in connection
 URLs, for example:
 
@@ -104,7 +122,8 @@ For a manual deployment, prepare application values:
 
 ```bash
 cp k8s/app/values-production.example.yaml k8s/values-production.yaml
-# Fill in the ACM certificate ARN, hostname, and immutable image tags.
+# Fill in the Google Cloud project, ACM certificate ARN, hostname, and immutable
+# image tags.
 ```
 
 Install the application. The migration Job runs first and blocks the rollout

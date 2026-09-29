@@ -1,6 +1,5 @@
 import "dotenv/config";
 import { randomUUID } from "node:crypto";
-import { GoogleGenAI } from "@google/genai";
 import type { Prisma } from "../../generated/prisma/client.js";
 import type { ExportedProfile } from "../lib/profileExport.js";
 import type {
@@ -17,16 +16,7 @@ import {
 import type { JobPostSource } from "./jobPost.js";
 import type { ResumeFillReport } from "./resumeRender.js";
 import { COACH_RUBRIC } from "./coachRubric.js";
-
-// The coach runs on a paid key of its own: COACH_GEMINI_MODEL is a Pro model,
-// and the free-tier APIKEY_* keys have no quota for it (they return 429).
-const apiKey = process.env.COACH_KEY;
-if (!apiKey)
-  throw new Error(
-    "COACH_KEY is required for the resume coach (a paid Gemini key with " +
-      `${COACH_GEMINI_MODEL} quota).`,
-  );
-const ai = new GoogleGenAI({ apiKey });
+import { getVertexAiClient } from "./vertexAi.js";
 
 const coachSchema = {
   type: "object",
@@ -183,7 +173,7 @@ export async function coachResume(
       : `JOB POSTING TEXT:\n${input.jobPost.text}`;
 
   return retryAiModelRequest("coach resume", async () => {
-    const interaction = await ai.interactions.create({
+    const interaction = await getVertexAiClient().interactions.create({
       model: COACH_GEMINI_MODEL,
       input: `
 You are a rigorous resume coach. Evaluate the draft against the job posting and

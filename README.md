@@ -79,6 +79,20 @@ DATABASE_URL="postgresql://postgres:myPassword@localhost:5432/resumebuilder"
 
 This tells Prisma how to connect to the PostgreSQL database running in Docker.
 
+The AI features use Vertex AI. Download a JSON key for a dedicated Google Cloud
+service account that has the Vertex AI User role, keep the key outside this
+repository, and add its absolute path and project to `backend/.env`:
+
+```env
+GOOGLE_CLOUD_PROJECT="your-google-cloud-project-id"
+GOOGLE_CLOUD_LOCATION="global"
+GOOGLE_APPLICATION_CREDENTIALS="/absolute/path/to/service-account.json"
+```
+
+The Google Cloud project must have billing and the Vertex AI API enabled. The
+credential path is read by Google's Application Default Credentials support;
+the application never parses or copies the private key itself.
+
 ## 3. Install Backend Dependencies
 
 From the `backend` folder, run:

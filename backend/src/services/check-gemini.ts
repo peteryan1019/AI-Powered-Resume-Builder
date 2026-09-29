@@ -14,25 +14,9 @@ import {
 } from "./resumeRender.js";
 import "dotenv/config";
 
-import { GoogleGenAI } from "@google/genai";
-// This service performs the writer's revision pass. The independent coach
-// grades in coach-gemini.ts and never rewrites the resume itself.
-// The writer runs on WRITER_GEMINI_MODEL, a Pro model, so it needs a PAID key:
-// the free-tier APIKEY_* keys have no quota for Pro and return 429. WRITER_KEY
-// lets the writer bill separately from the coach; it falls back to COACH_KEY so
-// a single paid key still works.
-const GEMINI_API_KEY = process.env.WRITER_KEY ?? process.env.COACH_KEY;
-
-if (!GEMINI_API_KEY) {
-  throw new Error(
-    "WRITER_KEY (or COACH_KEY) is required for the resume writer: a paid " +
-      "Gemini key with WRITER_GEMINI_MODEL quota.",
-  );
-}
+import { getVertexAiClient } from "./vertexAi.js";
 
 export type { TailorResumeInput } from "./jobPost.js";
-
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 export async function finalResume(
   input: Prisma.InputJsonObject,
@@ -88,7 +72,7 @@ specific job posting. Return a REVISED version that is strictly stronger, fully
 truthful, and better targeted.`;
 
   return retryAiModelRequest("finalize resume", async () => {
-    const interaction = await ai.interactions.create({
+    const interaction = await getVertexAiClient().interactions.create({
       model: WRITER_GEMINI_MODEL,
 
 input: `

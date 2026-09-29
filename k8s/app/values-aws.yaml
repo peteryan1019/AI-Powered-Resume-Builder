@@ -6,6 +6,10 @@ imagePullSecrets:
 config:
   frontendUrl: https://resume-builder.dev
   backendUrl: https://resume-builder.dev
+  # Set this before deployment; the service-account key must belong to a service
+  # account authorized to use Vertex AI in this project.
+  googleCloudProject: gen-lang-client-0825335631
+  googleCloudLocation: global
 
 ingress:
   enabled: true

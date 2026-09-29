@@ -19,6 +19,12 @@ config:
   frontendUrl: https://resume-builder.dev
   backendUrl: https://resume-builder.dev
   sessionTtlSeconds: "604800"
+  googleCloudProject: ""
+  googleCloudLocation: global
+
+# Created separately from the downloaded service-account JSON; never put the
+# private key itself in Helm values.
+googleCredentialsSecret: resumebuilder-google-cloud
 
 api:
   replicas: 1

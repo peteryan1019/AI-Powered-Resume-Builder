@@ -109,10 +109,11 @@ services:
       STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:?STRIPE_SECRET_KEY must be set}"
       STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:?STRIPE_WEBHOOK_SECRET must be set}"
       STRIPE_PRICE_ID: "${STRIPE_PRICE_ID:?STRIPE_PRICE_ID must be set}"
-      APIKEY_2: "${APIKEY_2:?APIKEY_2 must be set}"
-      APIKEY_3: "${APIKEY_3:?APIKEY_3 must be set}"
-      COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
-      WRITER_KEY: "${WRITER_KEY:-}"
+      GOOGLE_CLOUD_PROJECT: "${GOOGLE_CLOUD_PROJECT:?GOOGLE_CLOUD_PROJECT must be set}"
+      GOOGLE_CLOUD_LOCATION: "${GOOGLE_CLOUD_LOCATION:-global}"
+      GOOGLE_APPLICATION_CREDENTIALS: "/var/run/secrets/google/service-account.json"
+    volumes:
+      - "${GOOGLE_APPLICATION_CREDENTIALS:?GOOGLE_APPLICATION_CREDENTIALS must point to a service-account JSON file}:/var/run/secrets/google/service-account.json:ro"
     logging: *default-logging
 
   resume-worker:
@@ -132,8 +133,11 @@ services:
       REDIS_URL: "redis://redis:6379"
       RESUME_WORKER_CONCURRENCY: "${RESUME_WORKER_CONCURRENCY:-2}"
       WORKER_HEALTH_PORT: "3001"
-      COACH_KEY: "${COACH_KEY:?COACH_KEY must be set}"
-      WRITER_KEY: "${WRITER_KEY:-}"
+      GOOGLE_CLOUD_PROJECT: "${GOOGLE_CLOUD_PROJECT:?GOOGLE_CLOUD_PROJECT must be set}"
+      GOOGLE_CLOUD_LOCATION: "${GOOGLE_CLOUD_LOCATION:-global}"
+      GOOGLE_APPLICATION_CREDENTIALS: "/var/run/secrets/google/service-account.json"
+    volumes:
+      - "${GOOGLE_APPLICATION_CREDENTIALS:?GOOGLE_APPLICATION_CREDENTIALS must point to a service-account JSON file}:/var/run/secrets/google/service-account.json:ro"
     healthcheck:
       test:
         [

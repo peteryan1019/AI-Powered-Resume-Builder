@@ -1,13 +1,8 @@
 import type {Prisma, SectionType} from '../../generated/prisma/client.js';
 import "dotenv/config";
 import { loadProfileSchema } from "../lib/schema.js";
-import { GoogleGenAI } from "@google/genai";
 import { FASTEST_GEMINI_TEXT_MODEL } from "./geminiRetry.js"
-const GEMINI_API_KEY = process.env.APIKEY_3;
-
-if (!GEMINI_API_KEY) {
-  throw new Error("APIKEY_3 is required for PDF resume extraction.");
-}
+import { getVertexAiClient } from "./vertexAi.js";
 const Prompt = `
 Perform lossless resume extraction. Preserve the meaning, ownership, and
 structure of every piece of information. Do not summarize, infer, merge, or
@@ -173,13 +168,11 @@ export interface ImportedProfile {
   }>;
 }
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-
 export async function extractResume(input: Buffer): Promise<ImportedProfile> {
 
     const resumeSchema = await loadProfileSchema();
 
-    const interaction = await ai.interactions.create({
+    const interaction = await getVertexAiClient().interactions.create({
         model: FASTEST_GEMINI_TEXT_MODEL,
 
         input: [

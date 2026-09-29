@@ -8,3 +8,7 @@ backend/generated
 # Secrets — never commit
 .env
 backend/.env
+
+# Downloaded Google Cloud private keys
+*service-account*.json
+*google-credentials*.json

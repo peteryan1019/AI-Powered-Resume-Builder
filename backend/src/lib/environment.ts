@@ -13,17 +13,25 @@ const API_REQUIRED = [
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "STRIPE_PRICE_ID",
-  "APIKEY_2",
-  "APIKEY_3",
-  "COACH_KEY",
+  "GOOGLE_CLOUD_PROJECT",
+  "GOOGLE_CLOUD_LOCATION",
+  "GOOGLE_APPLICATION_CREDENTIALS",
 ] as const;
 
-const WORKER_REQUIRED = ["DATABASE_URL", "REDIS_URL", "COACH_KEY"] as const;
+const WORKER_REQUIRED = [
+  "DATABASE_URL",
+  "REDIS_URL",
+  "GOOGLE_CLOUD_PROJECT",
+  "GOOGLE_CLOUD_LOCATION",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+] as const;
 
 function looksLikePlaceholder(value: string): boolean {
   const normalized = value.trim().toLowerCase();
   return (
     normalized.startsWith("change-me") ||
+    normalized.startsWith("replace-with") ||
+    normalized.startsWith("replace_with") ||
     normalized.startsWith("your-") ||
     normalized.endsWith("_xxx") ||
     normalized === "you@example.com"
@@ -54,10 +62,6 @@ export function validateProductionEnvironment(service: Service): void {
     const value = process.env[name]?.trim();
     if (!value) errors.push(`${name} is required.`);
     else if (looksLikePlaceholder(value)) errors.push(`${name} still contains a placeholder.`);
-  }
-
-  if (!process.env.WRITER_KEY?.trim() && !process.env.COACH_KEY?.trim()) {
-    errors.push("WRITER_KEY or COACH_KEY is required for the resume writer.");
   }
 
   if (service === "api") {

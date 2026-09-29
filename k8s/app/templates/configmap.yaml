@@ -12,4 +12,6 @@ data:
   SESSION_TTL_SECONDS: {{ .Values.config.sessionTtlSeconds | quote }}
   FRONTEND_URL: {{ .Values.config.frontendUrl | quote }}
   BACKEND_URL: {{ .Values.config.backendUrl | quote }}
+  GOOGLE_CLOUD_PROJECT: {{ required "config.googleCloudProject is required" .Values.config.googleCloudProject | quote }}
+  GOOGLE_CLOUD_LOCATION: {{ .Values.config.googleCloudLocation | default "global" | quote }}
   REDIS_ADDRESS: redis:6379

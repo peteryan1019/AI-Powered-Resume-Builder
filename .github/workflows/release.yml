@@ -130,6 +130,7 @@ jobs:
           ready=true
           kubectl get namespace "$K8S_NAMESPACE" >/dev/null 2>&1 || ready=false
           kubectl -n "$K8S_NAMESPACE" get secret resumebuilder-secrets >/dev/null 2>&1 || ready=false
+          kubectl -n "$K8S_NAMESPACE" get secret resumebuilder-google-cloud >/dev/null 2>&1 || ready=false
           kubectl -n "$K8S_NAMESPACE" get statefulset postgres >/dev/null 2>&1 || ready=false
           kubectl -n "$K8S_NAMESPACE" get statefulset redis >/dev/null 2>&1 || ready=false
           echo "ready=$ready" >> "$GITHUB_OUTPUT"

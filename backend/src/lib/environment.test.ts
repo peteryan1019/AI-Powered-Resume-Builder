@@ -24,16 +24,15 @@ describe("production environment validation", () => {
       "STRIPE_SECRET_KEY",
       "STRIPE_WEBHOOK_SECRET",
       "STRIPE_PRICE_ID",
-      "APIKEY_2",
-      "APIKEY_3",
-      "COACH_KEY",
-      "WRITER_KEY",
+      "GOOGLE_CLOUD_PROJECT",
+      "GOOGLE_CLOUD_LOCATION",
+      "GOOGLE_APPLICATION_CREDENTIALS",
     ]) {
       vi.stubEnv(name, "");
     }
 
     expect(() => validateProductionEnvironment("api")).toThrowError(
-      /DATABASE_URL is required[\s\S]*RESEND_API_KEY is required[\s\S]*APIKEY_3 is required/,
+      /DATABASE_URL is required[\s\S]*RESEND_API_KEY is required[\s\S]*GOOGLE_APPLICATION_CREDENTIALS is required/,
     );
   });
 
@@ -52,18 +51,18 @@ describe("production environment validation", () => {
       STRIPE_SECRET_KEY: "sk_live_secure",
       STRIPE_WEBHOOK_SECRET: "whsec_secure",
       STRIPE_PRICE_ID: "price_secure",
-      APIKEY_2: "gemini-profile-key",
-      APIKEY_3: "gemini-parser-key",
-      COACH_KEY: "gemini-coach-key",
+      GOOGLE_CLOUD_PROJECT: "resume-builder-production",
+      GOOGLE_CLOUD_LOCATION: "global",
+      GOOGLE_APPLICATION_CREDENTIALS: "/var/run/secrets/google/service-account.json",
     };
     for (const [name, value] of Object.entries(validValues)) vi.stubEnv(name, value);
 
     vi.stubEnv("FRONTEND_URL", "http://resume.example.com");
     vi.stubEnv("SECRETKEY", "too-short");
-    vi.stubEnv("APIKEY_3", "your-gemini-api-key");
+    vi.stubEnv("GOOGLE_CLOUD_PROJECT", "your-google-cloud-project-id");
 
     expect(() => validateProductionEnvironment("api")).toThrowError(
-      /APIKEY_3 still contains a placeholder[\s\S]*SECRETKEY must be at least 32 characters[\s\S]*FRONTEND_URL must use https/,
+      /GOOGLE_CLOUD_PROJECT still contains a placeholder[\s\S]*SECRETKEY must be at least 32 characters[\s\S]*FRONTEND_URL must use https/,
     );
   });
 });
