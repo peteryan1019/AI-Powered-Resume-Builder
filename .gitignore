@@ -12,3 +12,20 @@ backend/.env
 # Downloaded Google Cloud private keys
 *service-account*.json
 *google-credentials*.json
+
+# Local reports, backups, credentials, and generated artifacts
+output/
+tmp/
+.venv/
+__pycache__/
+*.py[cod]
+.env.*
+!.env.example
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+SSH_KEYS
+assets/templates/jakesResume/
+frontend/public/assets/Peter_Yan_Resume_Thales.pdf

@@ -1,17 +1,64 @@
-# Resume Builder
+# AI-Powered Resume Builder · Tailr
 
-This project is a simple full-stack resume builder setup with:
+[![CI](https://github.com/peteryan1019/AI-Powered-Resume-Builder/actions/workflows/ci.yml/badge.svg)](https://github.com/peteryan1019/AI-Powered-Resume-Builder/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-- Angular frontend
-- Express backend
-- Prisma ORM
-- PostgreSQL database running in Docker
-- Redis 8 for BullMQ jobs, LangGraph checkpoints, and progress streams
-- A separate resume worker process
+Tailr turns a structured profile and a job description into a tailored resume.
+An AI writer drafts the content, a coach reviews it, and you choose which
+suggestions to apply before editing and downloading the final PDF.
 
-The application supports passwordless and Google authentication, structured
-profiles, asynchronous AI-assisted resume builds, PDF generation, saved
-resumes, and Stripe subscription access.
+- **Guided AI workflow:** background resume builds with progress updates,
+  persistent checkpoints, and a pause for your review.
+- **Editable PDF previews:** update content, reorder sections, and preview the
+  generated document in the browser.
+- **Three PDF templates:** Signal, Evergreen, and Atelier.
+- **Profiles and saved resumes:** passwordless email and Google sign-in,
+  structured profile import, and durable storage.
+- **Subscription access:** Stripe integration with a seven-day account trial.
+- **Deployment infrastructure:** Docker Compose, Helm charts, Terraform for AWS
+  EKS, and KEDA worker autoscaling.
+
+![Three resume templates rendered from fictional sample data](docs/resume-templates.png)
+
+### Architecture
+
+```mermaid
+flowchart LR
+  Browser[Angular frontend] --> API[Express API]
+  API --> DB[(PostgreSQL / Prisma)]
+  API --> Redis[(Redis / BullMQ)]
+  Redis --> Worker[LangGraph resume worker]
+  Worker --> AI[Gemini on Vertex AI]
+  Worker --> PDF[Python / ReportLab]
+  Worker --> DB
+  Worker --> Redis
+```
+
+### Project and attribution
+
+Maintained by [Peter Yan](https://github.com/peteryan1019). Originally developed
+as a CSCC09 team project at the University of Toronto Scarborough with
+[Tornadoguy26](https://github.com/Tornadoguy26) and
+Ruoxin. The public repository retains
+contributor attribution in its sanitized Git history. Private resume samples,
+deployment backups, and local credentials are excluded.
+
+Licensed under [MIT](LICENSE). See [third-party notices](THIRD_PARTY_NOTICES.md)
+for the font and template licenses, and [contributing](CONTRIBUTING.md) to help.
+
+### Running your own copy
+
+Use your own database, Redis, Vertex AI project, email sender, Google OAuth
+application, and Stripe test credentials. `.env.example` documents the service
+settings; for local development, put the applicable values in `backend/.env`
+and set `FRONTEND_URL` and `BACKEND_URL` to your localhost URLs. Install Python
+dependencies from `assets/requirements.txt` for PDF rendering.
+
+CI runs on pushes to `main` and pull requests. The production release workflow
+is manual and disabled unless `ENABLE_PRODUCTION_RELEASE=true` is explicitly
+configured as a repository variable. Deployment examples contain the original
+installation's domain, image names, and AWS identifiers; replace them with your
+own values before deploying. No production secrets are included.
 
 ## Prerequisites
 

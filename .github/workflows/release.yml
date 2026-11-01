@@ -1,15 +1,8 @@
 name: Publish and deploy to EKS
 
+# Production publishing is opt-in in this public repository. Configure your
+# own packages and AWS OIDC role before enabling it in repository variables.
 on:
-  push:
-    branches: [main]
-    paths:
-      - backend/**
-      - frontend/**
-      - assets/**
-      - k8s/app/**
-      - .github/workflows/ci.yml
-      - .github/workflows/release.yml
   workflow_dispatch:
 
 # Jobs opt into only the permissions they need.
@@ -26,6 +19,7 @@ env:
 jobs:
   ci:
     name: Test
+    if: vars.ENABLE_PRODUCTION_RELEASE == 'true'
     uses: ./.github/workflows/ci.yml
     permissions:
       contents: read

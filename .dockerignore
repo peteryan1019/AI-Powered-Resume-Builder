@@ -9,3 +9,15 @@ backend/dist
 *.log
 .claude
 .DS_Store
+
+output
+tmp
+**/.venv
+**/__pycache__
+k8s/secrets.env
+**/*service-account*.json
+**/*google-credentials*.json
+**/*.pem
+**/*.key
+infra/.terraform
+**/*.tfstate*

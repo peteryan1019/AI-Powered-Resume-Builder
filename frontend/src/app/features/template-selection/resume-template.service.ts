@@ -24,7 +24,7 @@ export class ResumeTemplateService {
       id: 'signal',
       title: 'Signal',
       description: 'Compact spacing and sharper section contrast for technical roles that skim fast.',
-      pdfPath: '/assets/Peter_Yan_Resume_Thales.pdf',
+      pdfPath: '/assets/resume_signal.pdf',
       highlight: 'Designed to spotlight bullets and metrics.'
     },
     {
